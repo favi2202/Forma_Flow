@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FormaFlow Local</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <span class="brand-mark">F</span>
+      <span><strong>FormaFlow</strong><small data-i18n="version">Local Document Intelligence v0.6.0</small></span>
+    </a>
+    <div class="top-actions">
+      <label class="language-box">
+        <span data-i18n="language">Language</span>
+        <select id="languageSelect" aria-label="Language">
+          <option value="en">English</option>
+          <option value="uz">O‘zbekcha</option>
+          <option value="ru">Русский</option>
+        </select>
+      </label>
+      <div class="privacy-chip" data-i18n="privacyChip">● Files stay on this computer</div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <span class="eyebrow" data-i18n="eyebrow">Teacher paperwork, minus the copy-paste</span>
+        <h1 data-i18n="heroTitle">Understand the document first. Build the right table second.</h1>
+        <p data-i18n="heroText">FormaFlow classifies school files, separates different table types, repairs difficult rosters, and lets you export only the dataset you actually need.</p>
+      </div>
+      <div class="hero-card">
+        <strong data-i18n="worksLocally">Works locally</strong>
+        <span data-i18n="formats">XLSX · XLS · CSV · DOCX · DOC · PDF → XLSX · CSV · DOCX</span>
+      </div>
+    </section>
+
+    <section class="workspace">
+      <div class="section-title">
+        <div><span class="step-label" data-i18n="step1">Step 1</span><h2 data-i18n="chooseFiles">Choose school documents</h2></div>
+        <span id="serverStatus" class="status checking" data-i18n="checkingServer">Checking local server…</span>
+      </div>
+
+      <form id="uploadForm" class="upload-panel">
+        <label for="fileInput" data-i18n="inputFiles">Excel, Word, CSV, or PDF files</label>
+        <input id="fileInput" name="files" type="file" multiple required accept=".xlsx,.xls,.xlsm,.csv,.docx,.doc,.pdf">
+        <p class="hint" data-i18n="uploadHint">Select one or many files. FormaFlow will classify them and separate incompatible tables instead of mixing everything blindly.</p>
+        <button id="processButton" class="primary" type="submit" data-i18n="processFiles">Analyze files</button>
+      </form>
+
+      <div id="uploadMessage" class="message hidden"></div>
+      <div id="fileResults" class="file-results hidden"></div>
+
+      <section id="datasetPanel" class="dataset-panel hidden">
+        <div class="dataset-heading">
+          <div>
+            <span class="step-label" data-i18n="stepDataset">Detected data</span>
+            <h2 data-i18n="chooseDataset">Choose which dataset to work with</h2>
+            <p data-i18n="datasetHelp">Different structures remain separate, so a financial table or monitoring report cannot accidentally enter a class roster.</p>
+          </div>
+          <label class="dataset-select-label">
+            <span data-i18n="dataset">Dataset</span>
+            <select id="datasetSelect"></select>
+          </label>
+        </div>
+        <div id="datasetInfo" class="dataset-info"></div>
+      </section>
+
+      <section id="builder" class="builder hidden">
+        <div class="section-title compact">
+          <div><span class="step-label" data-i18n="step2">Step 2</span><h2 data-i18n="chooseColumns">Choose, rename, and reorder columns</h2></div>
+          <button id="toggleAll" class="secondary" type="button" data-i18n="toggleAll">Toggle all</button>
+        </div>
+        <div id="columnList" class="column-list"></div>
+
+        <div class="section-title compact">
+          <div><span class="step-label" data-i18n="step3">Step 3</span><h2 data-i18n="buildColumns">Add fixed and calculated columns</h2></div>
+        </div>
+
+        <div class="builder-grid">
+          <section class="tool-card">
+            <div class="tool-title">
+              <div><h3 data-i18n="fixedValues">Same value for every row</h3><p data-i18n="fixedHelp">Example: academic year, school, or teacher.</p></div>
+              <button id="addFixed" class="secondary" type="button" data-i18n="addFixed">+ Fixed column</button>
+            </div>
+            <div id="fixedList" class="fixed-list">
+              <div class="fixed-row">
+                <input class="fixed-name" value="Academic year" data-default-key="academicYear" aria-label="Fixed column name">
+                <input class="fixed-value" value="2026–2027" aria-label="Fixed column value">
+                <button class="remove" type="button" aria-label="Remove">×</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="tool-card calculated-card">
+            <div class="tool-title">
+              <div><h3 data-i18n="calculatedColumns">Calculated columns</h3><p data-i18n="calculatedHelp">Create next class, row number, copies, or numeric changes.</p></div>
+              <div class="button-row">
+                <button id="addNextClass" class="secondary" type="button" data-i18n="addNextClass">+ Next class</button>
+                <button id="addDerived" class="secondary" type="button" data-i18n="addCalculated">+ Other</button>
+              </div>
+            </div>
+            <div class="rule-example" data-i18n="nextClassExample">Next class rule: 5-B → 6-B, 8-A → 9-A, while grades 9 and 11 become empty.</div>
+            <div id="derivedList" class="derived-list"></div>
+          </section>
+        </div>
+
+        <section class="tool-card cleaning-card">
+          <div class="tool-title"><div><h3 data-i18n="cleaning">Data cleaning</h3><p data-i18n="cleaningHelp">Optional corrections applied only to the exported copy.</p></div></div>
+          <div class="cleaning-grid">
+            <label class="check-option"><input id="trimWhitespace" type="checkbox" checked><span data-i18n="trimWhitespace">Trim and normalize spaces</span></label>
+            <label class="check-option"><input id="removeDuplicates" type="checkbox"><span data-i18n="removeDuplicates">Remove exact duplicate output rows</span></label>
+            <label class="select-option"><span data-i18n="skipBlank">Skip rows where this field is blank</span><select id="skipBlankKey"><option value="" data-i18n="disabled">Disabled</option></select></label>
+            <label class="select-option"><span data-i18n="sortBy">Sort by</span><select id="sortKey"><option value="" data-i18n="originalOrder">Original order</option></select></label>
+          </div>
+        </section>
+
+        <div class="section-title compact">
+          <div><span class="step-label" data-i18n="step4">Step 4</span><h2 data-i18n="previewExport">Preview and export</h2></div>
+          <span id="rowCount" class="status good"></span>
+        </div>
+        <div id="previewNote" class="preview-note"></div>
+        <div class="table-wrap"><table><thead id="previewHead"></thead><tbody id="previewBody"></tbody></table></div>
+        <div class="export-actions">
+          <button class="primary export" data-format="xlsx" type="button" data-i18n="downloadExcel">Download Excel</button>
+          <button class="secondary export" data-format="csv" type="button" data-i18n="downloadCsv">Download CSV</button>
+          <button class="secondary export" data-format="docx" type="button" data-i18n="downloadWord">Download Word</button>
+          <button id="clearButton" class="danger" type="button" data-i18n="clearData">Clear data</button>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

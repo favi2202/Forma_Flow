@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Runtime and local data
+*.log
+*.tmp
+uploads/
+exports/
+private_samples/
+real_samples/
+
+# Never commit school/student documents
+*.student-data.*

@@ -1,0 +1,55 @@
+name: Bug report
+description: Report an importer or export problem using synthetic data only
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not attach real student or staff records.** Replace all private data with synthetic values.
+  - type: input
+    id: version
+    attributes:
+      label: FormaFlow version
+      placeholder: v0.6.0
+    validations:
+      required: true
+  - type: dropdown
+    id: format
+    attributes:
+      label: Input format
+      options:
+        - XLSX/XLSM
+        - XLS
+        - CSV
+        - DOCX
+        - DOC
+        - PDF
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: structure
+    attributes:
+      label: Document structure
+      description: Describe headers, tables, merged cells, and the expected result without private data.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened?
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed or replaced all real personal information.
+          required: true

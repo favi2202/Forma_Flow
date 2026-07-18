@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest a workflow improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Repetitive task or problem
+      description: Describe what teachers currently do manually.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Suggested FormaFlow workflow
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: This request contains no real student or staff personal data.
+          required: true

@@ -1,0 +1,29 @@
+name: Build downloadable package
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create source package
+        run: |
+          mkdir -p dist/FormaFlow
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'dist' ./ dist/FormaFlow/
+          cd dist
+          zip -r FormaFlow-Local.zip FormaFlow
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FormaFlow-Local
+          path: dist/FormaFlow-Local.zip
