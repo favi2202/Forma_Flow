@@ -7,6 +7,11 @@ on:
     paths:
       - "android/**"
       - ".github/workflows/android-build-apk.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "android/**"
+      - ".github/workflows/android-build-apk.yml"
 
 permissions:
   contents: read
@@ -23,13 +28,14 @@ jobs:
         run: |
           cat source-parts/part-*.b64 | base64 --decode > /tmp/formaflow-android.tar.xz
           tar -xJf /tmp/formaflow-android.tar.xz --strip-components=1
+          sed -i 's/compileSdk = 37/compileSdk = 36/' app/build.gradle.kts
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
       - uses: android-actions/setup-android@v3
       - name: Install Android SDK
-        run: yes | sdkmanager "platforms;android-37" "build-tools;36.0.0"
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.5.0"
