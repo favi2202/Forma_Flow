@@ -1,0 +1,53 @@
+name: Apply FormaFlow Android v0.1.1
+
+on:
+  push:
+    branches: [privacy-mobile-v061]
+    paths:
+      - "scripts/apply_android_v011.py"
+      - ".github/workflows/apply-android-v011.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  migrate-build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply Android v0.1.1 migration
+        run: python scripts/apply_android_v011.py
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.5.0"
+
+      - name: Build Android debug APK
+        working-directory: android
+        run: gradle :app:assembleDebug --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FormaFlow-Android-v0.1.1-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Commit tested Android update
+        run: |
+          rm -f scripts/apply_android_v011.py .github/workflows/apply-android-v011.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Harden Android session cleanup for v0.1.1"
+          git push
