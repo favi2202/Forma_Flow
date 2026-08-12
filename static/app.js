@@ -1,3 +1,5 @@
+const isLocalRuntime = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+
 const state = {
   sessionId: null,
   columns: [],
@@ -11,13 +13,15 @@ const state = {
 
 const translations = {
   en: {
-    version: "Local Document Intelligence v0.6.0",
+    version: "Document Intelligence v0.6.1",
     language: "Language",
     privacyChip: "● Files stay on this computer",
+    privacyHosted: "● Files are processed on this server",
     eyebrow: "Teacher paperwork, minus the copy-paste",
     heroTitle: "Understand the document first. Build the right table second.",
     heroText: "FormaFlow classifies school files, separates different table types, repairs difficult rosters, and lets you export only the dataset you actually need.",
     worksLocally: "Works locally",
+    worksHosted: "Server-assisted",
     formats: "XLSX · XLS · CSV · DOCX · DOC · PDF → XLSX · CSV · DOCX",
     step1: "Step 1",
     chooseFiles: "Choose school documents",
@@ -59,8 +63,10 @@ const translations = {
     downloadWord: "Download Word",
     clearData: "Clear data",
     serverConnected: "Local server connected",
+    serverConnectedHosted: "Hosted server connected",
     serverNotConnected: "Server not connected",
     serverHelp: "Start the app with run.bat or python app.py, then open http://127.0.0.1:8000",
+    serverHelpHosted: "The hosted service is unavailable. Try again shortly.",
     chooseAtLeastOne: "Choose at least one file.",
     rowsLoaded: "{count} rows loaded from the selected dataset.",
     ready: "Ready",
@@ -71,6 +77,7 @@ const translations = {
     uploadFirst: "Upload files first.",
     downloadStarted: "{format} download started",
     cleared: "Local page data cleared",
+    clearedHosted: "Temporary server data cleared",
     untitled: "Untitled",
     outputName: "Output column name",
     moveUp: "Move up",
@@ -159,10 +166,12 @@ const translations = {
     version: "Mahalliy Document Intelligence v0.6.0",
     language: "Til",
     privacyChip: "● Fayllar shu kompyuterda qoladi",
+    privacyHosted: "● Fayllar ushbu serverda qayta ishlanadi",
     eyebrow: "O‘qituvchi hujjatlari — ortiqcha nusxalashsiz",
     heroTitle: "Avval hujjatni tushuning. Keyin kerakli jadvalni yarating.",
     heroText: "FormaFlow maktab fayllarini tasniflaydi, turli jadvallarni aralashtirmaydi, murakkab ro‘yxatlarni tuzatadi va faqat kerakli ma’lumotni eksport qiladi.",
     worksLocally: "Mahalliy ishlaydi",
+    worksHosted: "Server orqali ishlaydi",
     formats: "XLSX · XLS · CSV · DOCX · DOC · PDF → XLSX · CSV · DOCX",
     step1: "1-qadam",
     chooseFiles: "Maktab hujjatlarini tanlang",
@@ -204,8 +213,10 @@ const translations = {
     downloadWord: "Word yuklash",
     clearData: "Ma’lumotlarni tozalash",
     serverConnected: "Mahalliy server ulandi",
+    serverConnectedHosted: "Server ulandi",
     serverNotConnected: "Server ulanmagan",
     serverHelp: "run.bat yoki python app.py ni ishga tushiring, keyin http://127.0.0.1:8000 manzilini oching",
+    serverHelpHosted: "Server vaqtincha ishlamayapti. Birozdan keyin qayta urinib ko‘ring.",
     chooseAtLeastOne: "Kamida bitta fayl tanlang.",
     rowsLoaded: "Tanlangan to‘plamdan {count} qator yuklandi.",
     ready: "Tayyor",
@@ -216,6 +227,7 @@ const translations = {
     uploadFirst: "Avval fayllarni yuklang.",
     downloadStarted: "{format} yuklanishi boshlandi",
     cleared: "Mahalliy sahifa ma’lumotlari tozalandi",
+    clearedHosted: "Serverdagi vaqtinchalik ma’lumotlar tozalandi",
     untitled: "Nomsiz",
     outputName: "Natija ustuni nomi",
     moveUp: "Yuqoriga",
@@ -304,10 +316,12 @@ const translations = {
     version: "Локальный Document Intelligence v0.6.0",
     language: "Язык",
     privacyChip: "● Файлы остаются на этом компьютере",
+    privacyHosted: "● Файлы обрабатываются на этом сервере",
     eyebrow: "Школьные документы без бесконечного копирования",
     heroTitle: "Сначала понять документ. Затем собрать нужную таблицу.",
     heroText: "FormaFlow классифицирует школьные файлы, разделяет разные типы таблиц, исправляет сложные списки и экспортирует только нужный набор данных.",
     worksLocally: "Работает локально",
+    worksHosted: "Обработка на сервере",
     formats: "XLSX · XLS · CSV · DOCX · DOC · PDF → XLSX · CSV · DOCX",
     step1: "Шаг 1",
     chooseFiles: "Выберите школьные документы",
@@ -349,8 +363,10 @@ const translations = {
     downloadWord: "Скачать Word",
     clearData: "Очистить данные",
     serverConnected: "Локальный сервер подключен",
+    serverConnectedHosted: "Сервер подключен",
     serverNotConnected: "Сервер не подключен",
     serverHelp: "Запустите run.bat или python app.py и откройте http://127.0.0.1:8000",
+    serverHelpHosted: "Сервис временно недоступен. Попробуйте ещё раз чуть позже.",
     chooseAtLeastOne: "Выберите хотя бы один файл.",
     rowsLoaded: "Загружено строк из выбранного набора: {count}.",
     ready: "Готово",
@@ -361,6 +377,7 @@ const translations = {
     uploadFirst: "Сначала загрузите файлы.",
     downloadStarted: "Загрузка {format} началась",
     cleared: "Локальные данные страницы очищены",
+    clearedHosted: "Временные данные на сервере очищены",
     untitled: "Без названия",
     outputName: "Название выходного столбца",
     moveUp: "Выше",
@@ -514,6 +531,10 @@ function applyTranslations() {
     if (translations[state.language]?.[key]) element.textContent = t(key);
   });
   $("languageSelect").value = state.language;
+  const privacyChip = document.querySelector('[data-i18n="privacyChip"]');
+  if (privacyChip) privacyChip.textContent = isLocalRuntime ? t("privacyChip") : t("privacyHosted");
+  const runtimeMode = document.querySelector('[data-i18n="worksLocally"]');
+  if (runtimeMode) runtimeMode.textContent = isLocalRuntime ? t("worksLocally") : t("worksHosted");
   const defaultAcademic = fixedList.querySelector('[data-default-key="academicYear"]');
   if (defaultAcademic && defaultAcademic.dataset.auto !== "false") defaultAcademic.value = t("academicYear");
   renderDatasetPanel();
@@ -535,12 +556,12 @@ async function checkServer() {
   try {
     const response = await fetch("/health");
     if (!response.ok) throw new Error("health failed");
-    status.textContent = t("serverConnected");
+    status.textContent = isLocalRuntime ? t("serverConnected") : t("serverConnectedHosted");
     status.className = "status good";
   } catch {
     status.textContent = t("serverNotConnected");
     status.className = "status bad";
-    showMessage(t("serverHelp"), "error");
+    showMessage(isLocalRuntime ? t("serverHelp") : t("serverHelpHosted"), "error");
   }
 }
 
@@ -573,7 +594,11 @@ uploadForm.addEventListener("submit", async (event) => {
       throw new Error(detail?.message || detail || t("previewFailed"));
     }
 
+    const previousSessionId = state.sessionId;
     state.sessionId = payload.session_id;
+    if (previousSessionId && previousSessionId !== state.sessionId) {
+      fetch(`/api/session/${encodeURIComponent(previousSessionId)}`, { method: "DELETE" }).catch(() => {});
+    }
     state.files = payload.files || [];
     state.datasetGroups = payload.dataset_groups || [];
     state.activeDatasetId = payload.active_dataset_id;
@@ -1053,6 +1078,7 @@ async function downloadExport(format) {
 }
 
 $("clearButton").addEventListener("click", () => {
+  const sessionToDelete = state.sessionId;
   state.sessionId = null;
   state.columns = [];
   state.files = [];
@@ -1065,7 +1091,10 @@ $("clearButton").addEventListener("click", () => {
   fileResults.classList.add("hidden");
   derivedList.innerHTML = "";
   hideMessage();
-  showToast(t("cleared"));
+  if (sessionToDelete) {
+    fetch(`/api/session/${encodeURIComponent(sessionToDelete)}`, { method: "DELETE" }).catch(() => {});
+  }
+  showToast(isLocalRuntime ? t("cleared") : t("clearedHosted"));
 });
 
 applyTranslations();

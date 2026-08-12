@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "uz.formaflow.mobile"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "uz.formaflow.mobile"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
 
         buildConfigField("String", "FORMAFLOW_BASE_URL", "\"https://forma-flow.onrender.com/\"")
     }
@@ -26,6 +26,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
 
     buildTypes {
         release {

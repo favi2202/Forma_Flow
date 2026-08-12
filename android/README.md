@@ -1,4 +1,4 @@
-# FormaFlow Android v0.1
+# FormaFlow Android v0.1.1
 
 A native Android client for the existing FormaFlow FastAPI/Render backend.
 
@@ -33,7 +33,7 @@ The app itself does not make private copies of imported documents. The Android f
 
 1. Install the latest stable Android Studio.
 2. Open this folder as an Android Studio project.
-3. Allow Gradle sync to install Android SDK 37 and dependencies.
+3. Allow Gradle sync to install Android SDK 36 and dependencies.
 4. Connect an Android phone with USB debugging or start an emulator.
 5. Run the `app` configuration.
 
@@ -58,7 +58,7 @@ Command line:
 ## Current limitations
 
 - The free Render instance may sleep and make the first request slow.
-- Render sessions are in memory and disappear when the service restarts.
+- Render sessions are memory-only, expire after 30 minutes of inactivity, and are cleared when the user taps Clear.
 - Processing speed is still limited by the Render server.
 - Fixed columns, derived columns, custom sorting, and multilingual Android UI are planned for later versions.
 - This is a development/debug build until a private release signing key is configured.
@@ -68,6 +68,7 @@ Command line:
 - `app/src/main/java/.../data/` — API and models
 - `app/src/main/java/.../ui/` — state and Compose theme
 - `MainActivity.kt` — native mobile workflow and screens
+
 
 ## Repository location
 

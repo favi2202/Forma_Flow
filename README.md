@@ -1,6 +1,6 @@
 # FormaFlow
 
-[![Tests](https://github.com/favi2202/formaflow/actions/workflows/tests.yml/badge.svg)](https://github.com/favi2202/formaflow/actions/workflows/tests.yml)
+[![Tests](https://github.com/favi2202/Forma_Flow/actions/workflows/tests.yml/badge.svg)](https://github.com/favi2202/Forma_Flow/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Privacy-first local document intelligence for teachers and school staff.**
@@ -9,7 +9,7 @@
 
 FormaFlow turns messy Excel, Word, CSV, and supported PDF tables into clean Excel, CSV, or Word outputs. It classifies documents before extracting data, keeps incompatible datasets separate, and lets users review mappings before export.
 
-No cloud AI, accounts, analytics, or external file upload are used.
+Local desktop mode uses no cloud AI, accounts, analytics, or external file upload. The Android client uses the configured HTTPS FormaFlow server for processing.
 
 ## Quick start
 
@@ -112,6 +112,13 @@ The interface can switch between:
 - Uzbek Latin;
 - Russian.
 
+
+## Android app
+
+The repository also contains a native Kotlin + Jetpack Compose client under `android/`. It connects to the FastAPI backend, supports Android file picking, native preview, dataset switching, and XLSX/CSV/DOCX export.
+
+Android/server mode uploads only the files selected by the user to the configured HTTPS backend. The desktop/local mode remains fully local.
+
 ## Run on Windows
 
 1. Extract the ZIP into a normal folder.
@@ -162,6 +169,8 @@ clear warning, but its text cannot yet be extracted.
 - no database of students;
 - no analytics or telemetry;
 - sessions exist only in server memory;
+- sessions expire automatically after 30 minutes of inactivity;
+- sessions can be explicitly deleted by web/mobile clients;
 - restarting FormaFlow clears all session data;
 - exported files are written only when the user downloads them.
 
