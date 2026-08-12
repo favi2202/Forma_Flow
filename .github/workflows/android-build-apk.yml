@@ -3,7 +3,7 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, privacy-mobile-v061]
     paths:
       - "android/**"
       - ".github/workflows/android-build-apk.yml"
@@ -14,7 +14,7 @@ on:
       - ".github/workflows/android-build-apk.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -24,25 +24,45 @@ jobs:
         working-directory: android
     steps:
       - uses: actions/checkout@v4
-      - name: Restore Android source
+
+      - name: Materialize legacy packed Android source
         run: |
-          cat source-parts/part-*.b64 | base64 --decode > /tmp/formaflow-android.tar.xz
-          tar -xJf /tmp/formaflow-android.tar.xz --strip-components=1
-          sed -i 's/compileSdk = 37/compileSdk = 36/' app/build.gradle.kts
+          if [ -d source-parts ]; then
+            cat source-parts/part-*.b64 | base64 --decode > /tmp/formaflow-android.tar.xz
+            tar -xJf /tmp/formaflow-android.tar.xz --strip-components=1
+            rm -rf source-parts
+          fi
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
+
       - uses: android-actions/setup-android@v3
+
       - name: Install Android SDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.5.0"
+
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
+
       - uses: actions/upload-artifact@v4
         with:
           name: FormaFlow-Android-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Commit readable Android source
+        if: github.ref == 'refs/heads/privacy-mobile-v061'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Expose native Android source directly"
+            git push
+          fi
