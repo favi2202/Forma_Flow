@@ -5,7 +5,15 @@ import xlwt
 from fastapi.testclient import TestClient
 from openpyxl import Workbook, load_workbook
 
-from app import app, next_class_value, rows_to_records, is_repeated_header_row
+from app import (
+    SESSION_TTL_SECONDS,
+    SESSIONS,
+    app,
+    cleanup_sessions,
+    is_repeated_header_row,
+    next_class_value,
+    rows_to_records,
+)
 
 client = TestClient(app)
 
@@ -410,3 +418,45 @@ def test_different_docx_tables_are_flagged_and_best_table_is_used():
     assert summary["warning_code"] == "different_word_tables"
     keys = {column["key"] for column in payload["columns"]}
     assert {"student_name", "class", "grade"}.issubset(keys)
+
+
+def test_session_can_be_deleted_explicitly():
+    response = client.post(
+        "/api/upload",
+        files=[("files", ("class8.xlsx", make_xlsx(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))],
+    )
+    assert response.status_code == 200, response.text
+    session_id = response.json()["session_id"]
+    assert session_id in SESSIONS
+
+    deleted = client.delete(f"/api/session/{session_id}")
+    assert deleted.status_code == 204
+    assert deleted.headers["cache-control"] == "no-store"
+    assert session_id not in SESSIONS
+
+    preview = client.post(
+        "/api/preview",
+        json={
+            "session_id": session_id,
+            "columns": [{"key": "student_name", "name": "Student name"}],
+            "fixed_columns": [],
+            "derived_columns": [],
+            "options": {},
+            "limit": 10,
+        },
+    )
+    assert preview.status_code == 404
+
+
+def test_idle_session_cleanup_expires_old_records():
+    session_id = "expired-test-session"
+    SESSIONS[session_id] = {
+        "created_at": 100.0,
+        "last_access": 100.0,
+        "columns": [],
+        "records": [],
+        "dataset_groups": {},
+    }
+    removed = cleanup_sessions(now=100.0 + SESSION_TTL_SECONDS + 1)
+    assert removed >= 1
+    assert session_id not in SESSIONS

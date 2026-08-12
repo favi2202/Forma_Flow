@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.6.1 — Session Privacy & Mobile Hardening
+
+- Added 30-minute idle expiration for in-memory sessions.
+- Added explicit `DELETE /api/session/{session_id}` cleanup.
+- Active sessions refresh their idle timeout on dataset selection, preview, and export.
+- Added automated tests for session expiration and explicit deletion.
+- Documented the Android/server privacy boundary.
+
 ## v0.6.0 — Document Intelligence
 
 - Added deterministic document classification with confidence and reasons.

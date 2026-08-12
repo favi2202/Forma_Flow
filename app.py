@@ -8,6 +8,7 @@ import secrets
 import shutil
 import subprocess
 import tempfile
+import time
 import unicodedata
 import zipfile
 import xml.etree.ElementTree as ET
@@ -43,8 +44,10 @@ STATIC_DIR = ROOT / "static"
 MAX_FILE_BYTES = 25 * 1024 * 1024
 MAX_ROWS_PER_FILE = 50_000
 MAX_FILES = 50
+MAX_SESSIONS = 30
+SESSION_TTL_SECONDS = 30 * 60
 
-app = FastAPI(title="FormaFlow Local", version="0.6.0")
+app = FastAPI(title="FormaFlow Local", version="0.6.1")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
@@ -58,6 +61,31 @@ class ColumnInfo:
 
 
 SESSIONS: dict[str, dict[str, Any]] = {}
+
+
+def cleanup_sessions(now: float | None = None) -> int:
+    """Remove expired in-memory sessions and return the number removed."""
+    current = time.monotonic() if now is None else now
+    expired = [
+        session_id
+        for session_id, session in SESSIONS.items()
+        if current - float(session.get("last_access", session.get("created_at", current))) > SESSION_TTL_SECONDS
+    ]
+    for session_id in expired:
+        SESSIONS.pop(session_id, None)
+    return len(expired)
+
+
+def get_session(session_id: str) -> dict[str, Any]:
+    """Return a live session and refresh its idle timeout."""
+    now = time.monotonic()
+    cleanup_sessions(now)
+    session = SESSIONS.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session expired. Upload the files again.")
+    session["last_access"] = now
+    return session
+
 
 FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
     "row_number": {
@@ -2476,7 +2504,8 @@ def index() -> FileResponse:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "version": "0.6.0"}
+    cleanup_sessions()
+    return {"status": "ok", "version": "0.6.1"}
 
 
 @app.post("/api/upload")
@@ -2549,17 +2578,22 @@ async def upload(files: list[UploadFile] = File(...)) -> dict[str, Any]:
     session_id = secrets.token_urlsafe(18)
     group_map = {group["id"]: group for group in groups}
     active = groups[0] if groups else None
+    now = time.monotonic()
+    cleanup_sessions(now)
     SESSIONS[session_id] = {
+        "created_at": now,
+        "last_access": now,
         "columns": active["columns"] if active else [],
         "records": active["records"] if active else [],
         "files": summaries,
         "dataset_groups": group_map,
         "active_dataset_id": active["id"] if active else None,
     }
-    if len(SESSIONS) > 30:
-        oldest = next(iter(SESSIONS))
-        if oldest != session_id:
-            SESSIONS.pop(oldest, None)
+    while len(SESSIONS) > MAX_SESSIONS:
+        oldest = min(SESSIONS, key=lambda key: float(SESSIONS[key].get("last_access", 0.0)))
+        if oldest == session_id and len(SESSIONS) == 1:
+            break
+        SESSIONS.pop(oldest, None)
 
     public_groups = [
         {key: value for key, value in group.items() if key not in {"columns", "records"}}
@@ -2578,9 +2612,7 @@ async def upload(files: list[UploadFile] = File(...)) -> dict[str, Any]:
 
 @app.post("/api/select-dataset")
 def select_dataset(request: SelectDatasetRequest) -> dict[str, Any]:
-    session = SESSIONS.get(request.session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Session expired. Upload the files again.")
+    session = get_session(request.session_id)
     group = session.get("dataset_groups", {}).get(request.dataset_id)
     if group is None:
         raise HTTPException(status_code=404, detail="Dataset group was not found.")
@@ -2598,9 +2630,7 @@ def select_dataset(request: SelectDatasetRequest) -> dict[str, Any]:
 
 @app.post("/api/preview")
 def preview(request: PreviewRequest) -> dict[str, Any]:
-    session = SESSIONS.get(request.session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Session expired. Upload the files again.")
+    session = get_session(request.session_id)
     rows = build_output_rows(session, request)
     headers = list(rows[0].keys()) if rows else []
     return {
@@ -2613,9 +2643,7 @@ def preview(request: PreviewRequest) -> dict[str, Any]:
 
 @app.post("/api/export")
 def export(request: ExportRequest) -> Response:
-    session = SESSIONS.get(request.session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Session expired. Upload the files again.")
+    session = get_session(request.session_id)
     rows = build_output_rows(session, request)
     if not rows:
         raise HTTPException(status_code=400, detail="No rows available for export.")
@@ -2643,6 +2671,13 @@ def export(request: ExportRequest) -> Response:
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.delete("/api/session/{session_id}", status_code=204)
+def delete_session(session_id: str) -> Response:
+    """Explicitly discard a temporary session and its parsed records."""
+    SESSIONS.pop(session_id, None)
+    return Response(status_code=204, headers={"Cache-Control": "no-store"})
 
 
 if __name__ == "__main__":
