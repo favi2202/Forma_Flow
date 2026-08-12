@@ -7,6 +7,10 @@
 - Active sessions refresh their idle timeout on dataset selection, preview, and export.
 - Added automated tests for session expiration and explicit deletion.
 - Documented the Android/server privacy boundary.
+- Hosted web UI now clearly distinguishes server processing from local mode.
+- Web and Android clients explicitly delete replaced/cleared temporary sessions.
+- API responses send no-store and basic browser security headers.
+- Added a 75 MB combined-upload guard for public deployments.
 
 ## v0.6.0 — Document Intelligence
 

@@ -42,6 +42,7 @@ except ImportError:  # handled with a clear message at runtime
 ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
 MAX_FILE_BYTES = 25 * 1024 * 1024
+MAX_TOTAL_UPLOAD_BYTES = 75 * 1024 * 1024
 MAX_ROWS_PER_FILE = 50_000
 MAX_FILES = 50
 MAX_SESSIONS = 30
@@ -49,6 +50,17 @@ SESSION_TTL_SECONDS = 30 * 60
 
 app = FastAPI(title="FormaFlow Local", version="0.6.1")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.middleware("http")
+async def privacy_security_headers(request: Any, call_next: Any) -> Response:
+    response = await call_next(request)
+    if request.url.path.startswith("/api/") or request.url.path == "/health":
+        response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Frame-Options"] = "DENY"
+    return response
 
 
 @dataclass
@@ -2518,10 +2530,14 @@ async def upload(files: list[UploadFile] = File(...)) -> dict[str, Any]:
     summaries: list[dict[str, Any]] = []
     all_datasets: list[dict[str, Any]] = []
     parsed_count = 0
+    total_upload_bytes = 0
 
     for upload_file in files:
         filename = Path(upload_file.filename or "unnamed").name
         content = await upload_file.read()
+        total_upload_bytes += len(content)
+        if total_upload_bytes > MAX_TOTAL_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Combined upload exceeds 75 MB.")
         if len(content) > MAX_FILE_BYTES:
             summaries.append({"name": filename, "ok": False, "error": "File exceeds 25 MB."})
             continue

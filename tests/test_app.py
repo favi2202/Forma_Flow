@@ -460,3 +460,12 @@ def test_idle_session_cleanup_expires_old_records():
     removed = cleanup_sessions(now=100.0 + SESSION_TTL_SECONDS + 1)
     assert removed >= 1
     assert session_id not in SESSIONS
+
+
+def test_api_responses_are_not_cacheable():
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["x-frame-options"] == "DENY"
