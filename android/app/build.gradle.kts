@@ -27,6 +27,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+
     buildTypes {
         release {
             isMinifyEnabled = true

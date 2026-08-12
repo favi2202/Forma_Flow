@@ -69,6 +69,7 @@ Command line:
 - `app/src/main/java/.../ui/` — state and Compose theme
 - `MainActivity.kt` — native mobile workflow and screens
 
+
 ## Repository location
 
 This Android project lives in the `android/` directory of the FormaFlow repository. The backend remains at the repository root and is deployed separately on Render.
