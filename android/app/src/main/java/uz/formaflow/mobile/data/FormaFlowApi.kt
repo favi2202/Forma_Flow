@@ -113,6 +113,14 @@ class FormaFlowApi {
         )
     }
 
+    fun deleteSession(baseUrl: String, sessionId: String) {
+        val connection = open(baseUrl, "/api/session/$sessionId", "DELETE")
+        connection.useConnection { code, body, _ ->
+            ensureSuccess(code, body)
+            Unit
+        }
+    }
+
     fun export(baseUrl: String, payload: JSONObject, fallbackFormat: String): ExportResult {
         val connection = open(baseUrl, "/api/export", "POST").apply {
             doOutput = true
@@ -217,7 +225,7 @@ class FormaFlowApi {
             readTimeout = readTimeoutMs
             useCaches = false
             instanceFollowRedirects = true
-            setRequestProperty("User-Agent", "FormaFlow-Android/0.1")
+            setRequestProperty("User-Agent", "FormaFlow-Android/0.1.1")
         }
     }
 

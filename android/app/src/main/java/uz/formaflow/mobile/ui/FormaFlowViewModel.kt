@@ -125,8 +125,14 @@ class FormaFlowViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun clearAll() {
+        val snapshot = _state.value
         _state.update {
             FormaFlowUiState(baseUrl = it.baseUrl, serverState = it.serverState, serverVersion = it.serverVersion)
+        }
+        snapshot.sessionId?.let { sessionId ->
+            viewModelScope.launch(Dispatchers.IO) {
+                runCatching { api.deleteSession(snapshot.baseUrl, sessionId) }
+            }
         }
     }
 
@@ -178,6 +184,11 @@ class FormaFlowViewModel(application: Application) : AndroidViewModel(applicatio
                         statusMessage = response.message ?: "Analysis complete: ${response.rowCount} rows.",
                         errorMessage = null,
                     )
+                }
+                snapshot.sessionId?.takeIf { it != response.sessionId }?.let { oldSessionId ->
+                    viewModelScope.launch(Dispatchers.IO) {
+                        runCatching { api.deleteSession(snapshot.baseUrl, oldSessionId) }
+                    }
                 }
                 if (response.columns.isNotEmpty()) refreshPreview()
             }.onFailure { throwable ->

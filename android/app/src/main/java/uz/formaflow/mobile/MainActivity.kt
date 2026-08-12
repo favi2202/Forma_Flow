@@ -148,7 +148,7 @@ private fun FormaFlowScreen(viewModel: FormaFlowViewModel) {
                 item { ExportCard(state.phase, viewModel::export) }
                 item {
                     Text(
-                        "Temporary sessions are kept in Render memory. If the server restarts, upload the files again.",
+                        "Temporary server sessions expire after 30 minutes of inactivity. Clear removes the active session immediately.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
