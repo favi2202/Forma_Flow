@@ -18,7 +18,7 @@ from datetime import date, datetime
 from difflib import SequenceMatcher
 from pathlib import Path
 from html import unescape
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from docx import Document
 from docx.enum.section import WD_ORIENT
@@ -32,7 +32,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from bs4 import BeautifulSoup
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 try:
     import xlrd
@@ -1088,10 +1088,22 @@ class ProcessingOptions(BaseModel):
 
 class BuildRequest(BaseModel):
     session_id: str
+    dataset_id: str | None = None
     columns: list[OutputColumn]
     fixed_columns: list[FixedColumn] = Field(default_factory=list)
     derived_columns: list[DerivedColumn] = Field(default_factory=list)
     options: ProcessingOptions = Field(default_factory=ProcessingOptions)
+    manual_rows: list[Annotated[dict[
+        Annotated[str, Field(max_length=200)],
+        Annotated[str, Field(strict=True, max_length=2000)],
+    ], Field(max_length=200)]] = Field(default_factory=list, max_length=100)
+
+    @field_validator("manual_rows")
+    @classmethod
+    def limit_manual_text(cls, rows: list[dict[str, str]]) -> list[dict[str, str]]:
+        if sum(len(key) + len(value) for row in rows for key, value in row.items()) > 200_000:
+            raise ValueError("Manual entries exceed the 200,000 character limit.")
+        return rows
 
 
 class PreviewRequest(BuildRequest):
@@ -1170,12 +1182,26 @@ def derive_value(record: dict[str, Any], derived: DerivedColumn, row_number: int
 
 
 def build_output_rows(session: dict[str, Any], request: BuildRequest) -> list[dict[str, Any]]:
-    available = {column["key"] for column in session["columns"]}
+    # Explicit dataset identity keeps pending previews/exports isolated during a switch.
+    dataset = session
+    if request.dataset_id is not None:
+        dataset = session.get("dataset_groups", {}).get(request.dataset_id)
+        if dataset is None:
+            raise HTTPException(status_code=404, detail="Dataset group was not found.")
+    elif request.manual_rows:
+        raise HTTPException(status_code=400, detail="Choose a dataset for manual entries.")
+    available = {column["key"] for column in dataset["columns"]}
     requested = [column for column in request.columns if column.key in available]
     if not requested:
         raise HTTPException(status_code=400, detail="Select at least one source column.")
 
-    records = list(session["records"])
+    records = list(dataset["records"])
+    for row in request.manual_rows:
+        if set(row) - available:
+            raise HTTPException(status_code=400, detail="Manual entries contain an unknown source column.")
+        # Blank editor rows must not become phantom students, even with fixed columns.
+        if any(value.strip() for value in row.values()):
+            records.append(row)
     options = request.options
 
     if options.skip_blank_key and options.skip_blank_key in available:
@@ -2665,7 +2691,7 @@ def export(request: ExportRequest) -> Response:
         raise HTTPException(status_code=400, detail="No rows available for export.")
 
     export_format = request.format.lower()
-    active_group = session.get("dataset_groups", {}).get(session.get("active_dataset_id"), {})
+    active_group = session.get("dataset_groups", {}).get(request.dataset_id or session.get("active_dataset_id"), {})
     base = safe_filename(f"FormaFlow_{active_group.get('dataset_type', 'Output')}")
     if export_format == "xlsx":
         content = create_xlsx(rows)

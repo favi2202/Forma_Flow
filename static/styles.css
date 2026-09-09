@@ -74,3 +74,18 @@ main{max-width:1280px;margin:auto;padding:25px 28px 90px}.hero{display:grid;grid
   .file-card-rich{grid-template-columns:auto 1fr}
   .file-card-rich .file-card-status{grid-column:2;text-align:left}
 }
+
+/* Manual additions use source columns and the same export rules as imported rows. */
+.manual-card{margin-bottom:26px;min-width:0;border-color:rgba(99,91,255,.35)}
+.manual-card .tool-title p,.manual-note,.manual-empty,.manual-count{font-size:.875rem;line-height:1.55}
+.manual-note,.manual-empty{color:var(--muted);margin:12px 0 0}
+.manual-count{margin:12px 0 0;color:var(--purple2);font-weight:700}
+.manual-card .secondary{flex-shrink:0;min-height:44px;font-size:.875rem}
+.manual-card .table-wrap{max-height:390px;background:var(--surface)}
+.manual-card th,.manual-card td{font-size:.875rem;padding:9px}
+.manual-input{width:100%;min-width:180px;padding:11px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;font-size:1rem;color:var(--text);background:var(--surface)}
+.manual-row-number{min-width:48px;color:var(--muted)}
+.manual-card .remove{width:44px;min-width:44px;height:44px}
+.manual-card button:disabled{opacity:.55;cursor:not-allowed}
+.manual-card :focus-visible{outline:3px solid var(--purple);outline-offset:2px}
+.manual-card th small{display:block;color:var(--muted);font-weight:400;font-size:.875rem}
