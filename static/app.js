@@ -9,6 +9,8 @@ const state = {
   rowCount: 0,
   language: localStorage.getItem("formaFlowLanguage") || "en",
   previewTimer: null,
+  previewRevision: 0,
+  manualRows: new Map(),
 };
 
 const translations = {
@@ -58,6 +60,18 @@ const translations = {
     originalOrder: "Original order",
     step4: "Step 4",
     previewExport: "Preview and export",
+    manualTitle: "Missing students?",
+    manualHelp: "Add the missing rows here. Fixed values, calculations, and cleaning rules apply to these rows too. Only selected columns are exported.",
+    addStudent: "+ Add student",
+    addRow: "+ Add row",
+    manualGenericTitle: "Missing rows?",
+    manualEmpty: "Your imported rows stay unchanged. Add a row to start typing.",
+    manualNote: "Blank rows are ignored. Entries stay with their dataset while this page is open. Download your result before closing or reloading.",
+    manualCount: "{count} filled manual row(s) · {total}/100 rows added",
+    manualRow: "Added row {number}",
+    removeManual: "Remove added row {number}",
+    manualLimit: "You can add up to 100 rows per dataset.",
+    discardManual: "This will discard your manually added rows. Download your result first if you need to keep them. Continue?",
     downloadExcel: "Download Excel",
     downloadCsv: "Download CSV",
     downloadWord: "Download Word",
@@ -208,6 +222,18 @@ const translations = {
     originalOrder: "Asl tartib",
     step4: "4-qadam",
     previewExport: "Ko‘rib chiqish va eksport",
+    manualTitle: "Ro‘yxatda o‘quvchilar yetishmayaptimi?",
+    manualHelp: "Yetishmayotgan qatorlarni shu yerda qo‘shing. Doimiy qiymatlar, hisoblash va tozalash qoidalari bu qatorlarga ham qo‘llanadi. Faqat tanlangan ustunlar eksport qilinadi.",
+    addStudent: "+ O‘quvchi qo‘shish",
+    addRow: "+ Qator qo‘shish",
+    manualGenericTitle: "Qatorlar yetishmayaptimi?",
+    manualEmpty: "Fayldan olingan qatorlar o‘zgarmaydi. Yozishni boshlash uchun qator qo‘shing.",
+    manualNote: "Bo‘sh qatorlar hisobga olinmaydi. Sahifa ochiq turganida yozuvlar o‘z to‘plamida saqlanadi. Sahifani yopish yoki yangilashdan oldin natijani yuklab oling.",
+    manualCount: "{count} ta to‘ldirilgan qator · {total}/100 ta qator qo‘shildi",
+    manualRow: "Qo‘shilgan {number}-qator",
+    removeManual: "Qo‘shilgan {number}-qatorni olib tashlash",
+    manualLimit: "Har bir to‘plamga 100 tagacha qator qo‘shish mumkin.",
+    discardManual: "Qo‘lda qo‘shilgan qatorlar o‘chiriladi. Ularni saqlash uchun avval natijani yuklab oling. Davom etasizmi?",
     downloadExcel: "Excel yuklash",
     downloadCsv: "CSV yuklash",
     downloadWord: "Word yuklash",
@@ -358,6 +384,18 @@ const translations = {
     originalOrder: "Исходный порядок",
     step4: "Шаг 4",
     previewExport: "Предпросмотр и экспорт",
+    manualTitle: "Не хватает учеников?",
+    manualHelp: "Добавьте недостающие строки здесь. К ним также применяются постоянные значения, вычисления и очистка. Экспортируются только выбранные столбцы.",
+    addStudent: "+ Добавить ученика",
+    addRow: "+ Добавить строку",
+    manualGenericTitle: "Не хватает строк?",
+    manualEmpty: "Импортированные строки не изменятся. Добавьте строку, чтобы начать ввод.",
+    manualNote: "Пустые строки пропускаются. Записи остаются в своём наборе, пока страница открыта. Скачайте результат перед закрытием или перезагрузкой.",
+    manualCount: "Заполнено строк: {count} · Добавлено: {total}/100",
+    manualRow: "Добавленная строка {number}",
+    removeManual: "Удалить добавленную строку {number}",
+    manualLimit: "В каждый набор можно добавить до 100 строк.",
+    discardManual: "Добавленные вручную строки будут удалены. Сначала скачайте результат, если хотите сохранить их. Продолжить?",
     downloadExcel: "Скачать Excel",
     downloadCsv: "Скачать CSV",
     downloadWord: "Скачать Word",
@@ -514,6 +552,12 @@ function showToast(message) {
   showToast.timer = setTimeout(() => toast.classList.remove("show"), 2600);
 }
 
+function apiErrorMessage(detail, fallback = t("previewFailed")) {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) return detail.map((item) => item.msg || fallback).join("; ");
+  return detail?.message || fallback;
+}
+
 function showMessage(message, kind = "info") {
   uploadMessage.textContent = message;
   uploadMessage.className = `message ${kind}`;
@@ -542,6 +586,7 @@ function applyTranslations() {
   renderColumns();
   populateSourceSelects();
   renderDerivedRows(true);
+  renderManualRows();
 }
 
 $("languageSelect").addEventListener("change", (event) => {
@@ -571,6 +616,7 @@ uploadForm.addEventListener("submit", async (event) => {
     showMessage(t("chooseAtLeastOne"), "error");
     return;
   }
+  if (hasManualEntries() && !window.confirm(t("discardManual"))) return;
 
   hideMessage();
   processButton.disabled = true;
@@ -596,6 +642,8 @@ uploadForm.addEventListener("submit", async (event) => {
 
     const previousSessionId = state.sessionId;
     state.sessionId = payload.session_id;
+    state.manualRows.clear();
+    state.previewRevision += 1;
     if (previousSessionId && previousSessionId !== state.sessionId) {
       fetch(`/api/session/${encodeURIComponent(previousSessionId)}`, { method: "DELETE" }).catch(() => {});
     }
@@ -621,6 +669,11 @@ uploadForm.addEventListener("submit", async (event) => {
     }
   } catch (error) {
     showMessage(error.message || String(error), "error");
+    // A failed replacement upload must leave existing manual entries reachable.
+    if (state.activeDatasetId) {
+      builder.classList.remove("hidden");
+      renderDatasetPanel();
+    }
   } finally {
     processButton.disabled = false;
     processButton.textContent = t("processFiles");
@@ -709,21 +762,24 @@ function renderDatasetInfo() {
 
 datasetSelect.addEventListener("change", async () => {
   if (!state.sessionId) return;
+  const sessionId = state.sessionId;
   const datasetId = datasetSelect.value;
   datasetSelect.disabled = true;
   try {
     const response = await fetch("/api/select-dataset", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: state.sessionId, dataset_id: datasetId }),
+      body: JSON.stringify({ session_id: sessionId, dataset_id: datasetId }),
     });
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.detail || t("previewFailed"));
+    if (sessionId !== state.sessionId) return;
+    if (!response.ok) throw new Error(apiErrorMessage(payload.detail));
     state.activeDatasetId = payload.active_dataset_id;
     applyActiveDataset(payload);
     renderDatasetPanel();
     showToast(t("rowsLoaded", { count: payload.row_count }));
   } catch (error) {
+    datasetSelect.value = state.activeDatasetId;
     showToast(error.message || String(error));
   } finally {
     datasetSelect.disabled = false;
@@ -736,6 +792,7 @@ function applyActiveDataset(payload) {
   state.activeDatasetId = payload.active_dataset_id || state.activeDatasetId;
   derivedList.innerHTML = "";
   renderColumns();
+  renderManualRows();
   populateSourceSelects();
   ensureDefaultNextClass();
   builder.classList.remove("hidden");
@@ -784,6 +841,75 @@ function methodLabel(method) {
   };
   return t(mapping[method] || "methodCustom");
 }
+
+function activeManualRows() {
+  if (!state.activeDatasetId) return [];
+  if (!state.manualRows.has(state.activeDatasetId)) state.manualRows.set(state.activeDatasetId, []);
+  return state.manualRows.get(state.activeDatasetId);
+}
+
+function hasManualEntries() {
+  return [...state.manualRows.values()].some((rows) => rows.some((row) => Object.values(row).some((value) => value.trim())));
+}
+
+function updateManualCount() {
+  const rows = activeManualRows();
+  const filled = rows.filter((row) => Object.values(row).some((value) => value.trim())).length;
+  $("manualCount").textContent = rows.length ? t("manualCount", { count: filled, total: rows.length }) : "";
+  $("addStudent").disabled = rows.length >= 100 || !state.columns.length;
+}
+
+function renderManualRows() {
+  const rows = activeManualRows();
+  const hasStudents = state.columns.some((column) => ["student_name", "first_name", "last_name"].includes(column.key));
+  $("manualTitle").textContent = t(hasStudents ? "manualTitle" : "manualGenericTitle");
+  $("addStudent").textContent = t(hasStudents ? "addStudent" : "addRow");
+  $("manualEmpty").classList.toggle("hidden", rows.length > 0);
+  $("manualTable").classList.toggle("hidden", rows.length === 0);
+  $("manualHead").innerHTML = `<tr><th scope="col">#</th>${state.columns.map((column) => `<th scope="col">${escapeHtml(canonicalLabel(column))}${column.sensitive ? `<small>${escapeHtml(t("sensitiveField"))}</small>` : ""}</th>`).join("")}<th scope="col">${escapeHtml(t("remove"))}</th></tr>`;
+  $("manualBody").innerHTML = rows.map((row, index) => `<tr>
+    <th scope="row" class="manual-row-number">${index + 1}</th>
+    ${state.columns.map((column) => `<td><input class="manual-input" type="text" data-row="${index}" data-key="${escapeHtml(column.key)}" value="${escapeHtml(row[column.key] || "")}" maxlength="2000" autocomplete="off" aria-label="${escapeHtml(t("manualRow", { number: index + 1 }) + ": " + canonicalLabel(column))}" aria-describedby="manualHelp"></td>`).join("")}
+    <td><button class="remove" type="button" data-row="${index}" aria-label="${escapeHtml(t("removeManual", { number: index + 1 }))}">×</button></td>
+  </tr>`).join("");
+  updateManualCount();
+}
+
+$("addStudent").addEventListener("click", () => {
+  if (!state.activeDatasetId || !state.columns.length) return;
+  const rows = activeManualRows();
+  if (rows.length >= 100) return showToast(t("manualLimit"));
+  rows.push({});
+  renderManualRows();
+  $("manualBody").lastElementChild?.querySelector("input")?.focus();
+  renderPreviewDebounced();
+});
+
+$("manualBody").addEventListener("input", (event) => {
+  if (!event.target.classList.contains("manual-input")) return;
+  const row = activeManualRows()[Number(event.target.dataset.row)];
+  if (!row) return;
+  row[event.target.dataset.key] = event.target.value;
+  updateManualCount();
+  renderPreviewDebounced();
+});
+
+$("manualBody").addEventListener("click", (event) => {
+  const button = event.target.closest("button.remove");
+  if (!button) return;
+  const index = Number(button.dataset.row);
+  activeManualRows().splice(index, 1);
+  renderManualRows();
+  const next = $("manualBody").children[index] || $("manualBody").lastElementChild;
+  (next?.querySelector("input") || $("addStudent")).focus();
+  renderPreviewDebounced();
+});
+
+window.addEventListener("beforeunload", (event) => {
+  if (!hasManualEntries()) return;
+  event.preventDefault();
+  event.returnValue = "";
+});
 
 function renderColumns() {
   if (!columnList || !state.columns.length) {
@@ -963,6 +1089,8 @@ function getOptions() {
 function buildPayload() {
   return {
     session_id: state.sessionId,
+    dataset_id: state.activeDatasetId,
+    manual_rows: activeManualRows(),
     columns: getSelectedColumns(),
     fixed_columns: getFixedColumns(),
     derived_columns: getDerivedColumns(),
@@ -971,6 +1099,7 @@ function buildPayload() {
 }
 
 function renderPreviewDebounced() {
+  state.previewRevision += 1;
   if (!state.sessionId || !state.activeDatasetId) return;
   clearTimeout(state.previewTimer);
   previewNote.textContent = t("previewLoading");
@@ -978,6 +1107,8 @@ function renderPreviewDebounced() {
 }
 
 async function updatePreview() {
+  if (!state.sessionId || !state.activeDatasetId) return;
+  const revision = state.previewRevision;
   const columns = getSelectedColumns();
   if (!columns.length) {
     previewHead.innerHTML = "";
@@ -992,7 +1123,8 @@ async function updatePreview() {
       body: JSON.stringify({ ...buildPayload(), limit: 50 }),
     });
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.detail || t("previewFailed"));
+    if (revision !== state.previewRevision) return;
+    if (!response.ok) throw new Error(apiErrorMessage(payload.detail));
     rowCount.textContent = t("rows", { count: payload.row_count });
     previewNote.textContent = t("previewShowing", { shown: payload.preview_count, count: payload.row_count });
     previewHead.innerHTML = payload.headers.length ? `<tr>${payload.headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>` : "";
@@ -1000,6 +1132,7 @@ async function updatePreview() {
       ? payload.rows.map((row) => `<tr>${payload.headers.map((header) => `<td>${escapeHtml(row[header] ?? "")}</td>`).join("")}</tr>`).join("")
       : `<tr><td>${escapeHtml(t("selectColumn"))}</td></tr>`;
   } catch (error) {
+    if (revision !== state.previewRevision) return;
     previewNote.textContent = error.message || t("previewFailed");
   }
 }
@@ -1059,7 +1192,7 @@ async function downloadExport(format) {
   });
   if (!response.ok) {
     const payload = await response.json();
-    showToast(typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail));
+    showToast(apiErrorMessage(payload.detail));
     return;
   }
   const blob = await response.blob();
@@ -1078,6 +1211,7 @@ async function downloadExport(format) {
 }
 
 $("clearButton").addEventListener("click", () => {
+  if (hasManualEntries() && !window.confirm(t("discardManual"))) return;
   const sessionToDelete = state.sessionId;
   state.sessionId = null;
   state.columns = [];
@@ -1085,6 +1219,10 @@ $("clearButton").addEventListener("click", () => {
   state.datasetGroups = [];
   state.activeDatasetId = null;
   state.rowCount = 0;
+  state.manualRows.clear();
+  state.previewRevision += 1;
+  clearTimeout(state.previewTimer);
+  renderManualRows();
   fileInput.value = "";
   builder.classList.add("hidden");
   datasetPanel.classList.add("hidden");

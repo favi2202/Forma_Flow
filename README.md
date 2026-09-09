@@ -38,6 +38,33 @@ Then open `http://127.0.0.1:8000`.
 
 ## What v0.6 understands
 
+### Add missing students by hand
+
+After analyzing a document and choosing a dataset, go to **Preview and export →
+Missing students? → + Add student**. Type into the new row, then add more rows
+as needed (up to 100 per dataset). For other table types, the button is **+ Add row**.
+Each added row can be edited or removed with its × button.
+
+Added rows appear after the imported rows unless sorting is enabled. They use the
+same selected columns, fixed values, calculations, and cleaning rules in the
+preview and Excel, CSV, and Word downloads. Entirely blank rows are ignored;
+duplicate removal and blank-field filters may also exclude rows when enabled.
+Imported data is not modified.
+
+Manual entries stay with their own dataset when switching datasets or languages.
+They are held in the current page's memory and included in preview/export
+requests, without being saved to browser storage or added to the server's source
+records. **Download before closing or reloading the page.** A successful new upload
+or **Clear data** discards them after confirmation. On the hosted site, requests
+are processed by the configured server, including manual entries.
+
+API clients can pass `dataset_id` and `manual_rows` to `/api/preview` and
+`/api/export`. Each row maps existing source column keys to string values.
+`dataset_id` is required when sending manual rows; existing clients that omit both
+fields remain compatible. Limits: 100 rows, 200 fields per row, 2,000 characters
+per value, and 200,000 combined key/value characters per request. The native
+Android interface does not yet expose the manual-row editor.
+
 ### Input formats
 
 - `.xlsx`, `.xlsm`, genuine binary `.xls`, and `.csv`

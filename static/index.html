@@ -122,7 +122,22 @@
           <div><span class="step-label" data-i18n="step4">Step 4</span><h2 data-i18n="previewExport">Preview and export</h2></div>
           <span id="rowCount" class="status good"></span>
         </div>
-        <div id="previewNote" class="preview-note"></div>
+        <section class="tool-card manual-card" aria-labelledby="manualTitle">
+          <div class="tool-title">
+            <div>
+              <h3 id="manualTitle" data-i18n="manualTitle">Missing students?</h3>
+              <p id="manualHelp" data-i18n="manualHelp">Add the missing rows here. Fixed values, calculations, and cleaning rules apply to these rows too. Only selected columns are exported.</p>
+            </div>
+            <button id="addStudent" class="secondary" type="button" data-i18n="addStudent">+ Add student</button>
+          </div>
+          <p id="manualEmpty" class="manual-empty" data-i18n="manualEmpty">Your imported rows stay unchanged. Add a student to start typing.</p>
+          <div id="manualTable" class="table-wrap hidden" role="region" aria-labelledby="manualTitle" tabindex="0">
+            <table><thead id="manualHead"></thead><tbody id="manualBody"></tbody></table>
+          </div>
+          <p id="manualCount" class="manual-count" role="status" aria-live="polite"></p>
+          <p class="manual-note" data-i18n="manualNote">Blank rows are ignored. Entries stay with their dataset while this page is open. Download your result before closing or reloading.</p>
+        </section>
+        <div id="previewNote" class="preview-note" role="status" aria-live="polite"></div>
         <div class="table-wrap"><table><thead id="previewHead"></thead><tbody id="previewBody"></tbody></table></div>
         <div class="export-actions">
           <button class="primary export" data-format="xlsx" type="button" data-i18n="downloadExcel">Download Excel</button>

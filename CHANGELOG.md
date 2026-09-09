@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Add editable manual rows to the web preview/export workflow, with English,
+  Uzbek, and Russian labels and per-dataset state.
+- Include additions in Excel, CSV, and Word using existing output rules; ignore
+  blank additions and validate row, field, and text limits.
+- Use explicit dataset identities for new preview/export requests and ignore
+  outdated preview responses after edits or dataset changes.
+- Warn before discarding filled manual entries, and keep them accessible when a
+  replacement upload fails.
+
 ## v0.6.1 — Session Privacy & Mobile Hardening
 
 - Added 30-minute idle expiration for in-memory sessions.
