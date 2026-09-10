@@ -874,7 +874,7 @@ function renderManualRows() {
   </tr>`).join("");
   updateManualCount();
   // Reveal only after this script has translated and initialized the editor.
-  $("manualPanel").classList.remove("hidden");
+  $("manualPanel")?.classList.remove("hidden");
 }
 
 $("addStudent").addEventListener("click", () => {
