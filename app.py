@@ -523,7 +523,7 @@ def is_repeated_header_row(row: list[Any], primary_header: list[Any]) -> bool:
     if (
         recognized_count >= 2
         and len(distinct_known_fields) >= 2
-        and recognized_count / len(non_empty) >= 0.67
+        and recognized_count * 3 >= len(non_empty) * 2
     ):
         return True
 
@@ -1089,6 +1089,7 @@ class ProcessingOptions(BaseModel):
     remove_duplicates: bool = False
     skip_blank_key: str | None = None
     sort_key: str | None = None
+    renumber_rows: bool = True
 
 
 class BuildRequest(BaseModel):
@@ -1098,6 +1099,8 @@ class BuildRequest(BaseModel):
     fixed_columns: list[FixedColumn] = Field(default_factory=list)
     derived_columns: list[DerivedColumn] = Field(default_factory=list)
     options: ProcessingOptions = Field(default_factory=ProcessingOptions)
+    row_order: list[Annotated[str, Field(pattern=r"^(source:[0-9]+|manual:[A-Za-z0-9_-]{1,64})$")]] = Field(default_factory=list, max_length=MAX_ROWS_PER_FILE * MAX_FILES + 100)
+    manual_row_ids: list[Annotated[str, Field(pattern=r"^manual:[A-Za-z0-9_-]{1,64}$")]] = Field(default_factory=list, max_length=100)
     manual_rows: list[Annotated[dict[
         Annotated[str, Field(max_length=200)],
         Annotated[str, Field(strict=True, max_length=2000)],
@@ -1113,6 +1116,8 @@ class BuildRequest(BaseModel):
 
 class PreviewRequest(BuildRequest):
     limit: int = Field(default=50, ge=1, le=200)
+    offset: int = Field(default=0, ge=0)
+    focus_row_id: str | None = Field(default=None, max_length=80)
 
 
 class ExportRequest(BuildRequest):
@@ -1187,38 +1192,60 @@ def derive_value(record: dict[str, Any], derived: DerivedColumn, row_number: int
 
 
 def build_output_rows(session: dict[str, Any], request: BuildRequest) -> list[dict[str, Any]]:
+    return build_output_result(session, request)[0]
+
+
+def build_output_result(session: dict[str, Any], request: BuildRequest) -> tuple[list[dict[str, Any]], list[str]]:
     # Explicit dataset identity keeps pending previews/exports isolated during a switch.
     dataset = session
     if request.dataset_id is not None:
         dataset = session.get("dataset_groups", {}).get(request.dataset_id)
         if dataset is None:
             raise HTTPException(status_code=404, detail="Dataset group was not found.")
-    elif request.manual_rows:
+    elif request.manual_rows or request.row_order:
         raise HTTPException(status_code=400, detail="Choose a dataset for manual entries.")
     available = {column["key"] for column in dataset["columns"]}
     requested = [column for column in request.columns if column.key in available]
     if not requested:
         raise HTTPException(status_code=400, detail="Select at least one source column.")
 
-    records = list(dataset["records"])
-    for row in request.manual_rows:
+    names = [col.name for col in requested] + [col.name for col in request.fixed_columns] + [col.name for col in request.derived_columns]
+    if len(names) != len(set(names)):
+        raise HTTPException(status_code=400, detail="Each output column needs a different name.")
+    manual_ids = request.manual_row_ids or [f"manual:{index}" for index in range(len(request.manual_rows))]
+    if len(manual_ids) != len(request.manual_rows) or len(set(manual_ids)) != len(manual_ids):
+        raise HTTPException(status_code=400, detail="Manual row identities must be unique and match the entries.")
+    records = [(f"source:{index}", record) for index, record in enumerate(dataset["records"])]
+    valid_ids = {row_id for row_id, _ in records} | set(manual_ids)
+    if len(set(request.row_order)) != len(request.row_order) or set(request.row_order) - valid_ids:
+        raise HTTPException(status_code=400, detail="Row order contains duplicate or unknown rows.")
+    for row_id, row in zip(manual_ids, request.manual_rows):
         if set(row) - available:
             raise HTTPException(status_code=400, detail="Manual entries contain an unknown source column.")
         # Blank editor rows must not become phantom students, even with fixed columns.
         if any(value.strip() for value in row.values()):
-            records.append(row)
+            records.append((row_id, row))
     options = request.options
 
     if options.skip_blank_key and options.skip_blank_key in available:
-        records = [record for record in records if cell_has_value(record.get(options.skip_blank_key, ""))]
+        records = [(row_id, record) for row_id, record in records if cell_has_value(record.get(options.skip_blank_key, ""))]
 
     if options.sort_key and options.sort_key in available:
-        records.sort(key=lambda record: natural_sort_value(record.get(options.sort_key, "")))
+        records.sort(key=lambda item: natural_sort_value(item[1].get(options.sort_key, "")))
+
+    if request.row_order:
+        positions = {row_id: index for index, row_id in enumerate(request.row_order)}
+        records.sort(key=lambda item: positions.get(item[0], len(positions)))
 
     output_rows: list[dict[str, Any]] = []
+    output_ids: list[str] = []
     seen: set[tuple[str, ...]] = set()
+    numbered_names = {column.name for column in requested if options.renumber_rows and canonical_base_key(column.key) == "row_number"}
+    numbered_names.update(column.name for column in request.derived_columns if column.kind == "sequence")
+    numbered_names.update(column.name for column in request.derived_columns if options.renumber_rows and canonical_base_key(column.source_key or "") == "row_number")
 
-    for row_number, record in enumerate(records):
+    for row_id, record in records:
+        row_number = len(output_rows)
         output: OrderedDict[str, Any] = OrderedDict()
         for column in requested:
             output[column.name] = clean_output_value(
@@ -1235,13 +1262,25 @@ def build_output_rows(session: dict[str, Any], request: BuildRequest) -> list[di
 
         output_dict = dict(output)
         if options.remove_duplicates:
-            fingerprint = tuple(str(value) for value in output_dict.values())
+            fingerprint = tuple(str(value) for key, value in output_dict.items() if key not in numbered_names)
             if fingerprint in seen:
                 continue
             seen.add(fingerprint)
+        if options.renumber_rows:
+            numbered_record = dict(record)
+            for key in available:
+                if canonical_base_key(key) == "row_number":
+                    numbered_record[key] = row_number + 1
+            for column in requested:
+                if canonical_base_key(column.key) == "row_number":
+                    output_dict[column.name] = row_number + 1
+            for derived in request.derived_columns:
+                if derived.name in numbered_names:
+                    output_dict[derived.name] = derive_value(numbered_record, derived, row_number)
         output_rows.append(output_dict)
+        output_ids.append(row_id)
 
-    return output_rows
+    return output_rows, output_ids
 
 
 def safe_filename(name: str) -> str:
@@ -1375,6 +1414,7 @@ FIELD_DEFINITIONS.update({
 
 FIELD_DEFINITIONS["row_number"]["aliases"].extend(["t/r", "t r", "tr", "t\\r"])
 FIELD_DEFINITIONS["student_name"]["aliases"].extend([
+    "name", "names", "ism/familiya", "ism va familiya", "ism familya",
     "ism sharifi", "ism familiyasi", "ism va familiyasi", "ism familyasi",
     "o'quvchilar ismi va familyasi", "o‘quvchilar ismi va familyasi",
     "o'quvchining ism va familiyasi", "o‘quvchining ism va familiyasi",
@@ -1413,14 +1453,19 @@ def recognize_header(header: Any) -> ColumnInfo:
     if original.strip() == "%" or normalized in {"foiz", "фоиз", "percent", "percentage", "процент"}:
         return ColumnInfo("percentage", FIELD_DEFINITIONS["percentage"]["label"], original, 0.99, "alias")
 
+    # Exact headings outrank phrase guesses (notably Student name and parent names).
+    for key, label, alias_norm, alias_compact in ALIAS_INDEX:
+        if normalized == alias_norm or compact == alias_compact:
+            return ColumnInfo(key, label, original, 0.99, "alias")
+
     # High-value phrases that token matching can otherwise misunderstand.
     phrase_rules = [
         ("promoted_class", ("ko'chirilgan sinfi", "ko chirilgan sinfi", "keyingi sinf", "promoted class", "next class")),
-        ("student_name", ("ism sharifi", "ism familiyasi", "ism familyasi", "f i sh", "фио", "исм фамилияси", "исм шарифи")),
+        ("student_name", ("ism sharifi", "ism familiyasi", "ism familyasi", "ism familiya", "familiya ism", "f i sh", "фио", "исм фамилияси", "исм шарифи")),
         ("row_number", ("t r", "t n", "tartib raqam", "п п")),
     ]
     for key, phrases in phrase_rules:
-        if any(phrase in normalized for phrase in phrases):
+        if any(re.search(r"(?<!\w)" + re.escape(phrase) + r"(?!\w)", normalized) for phrase in phrases):
             return ColumnInfo(key, FIELD_DEFINITIONS[key]["label"], original, 0.98, "alias")
 
     # Context-aware guardian contact headings produced by two-level tables.
@@ -1585,24 +1630,39 @@ def is_footer_or_label(value: Any) -> bool:
 
 
 def infer_columns_from_values(columns: list[ColumnInfo], records: list[dict[str, Any]]) -> list[ColumnInfo]:
-    """Recover meanings for blank headers using the values beneath them."""
-    occupied = {canonical_base_key(column.key) for column in columns if column.method != "custom"}
+    """Use value evidence to repair ambiguous headings; preserve explicit meanings."""
+    samples = {
+        column.key: [record[column.key] for record in records[:100] if cell_has_value(record.get(column.key))]
+        for column in columns
+    }
+    candidates = set()
+    for column in columns:
+        values = samples[column.key]
+        base = canonical_base_key(column.key)
+        # Numeric headings and exact semantic headers keep their explicit meaning.
+        # A duplicate No. column containing names is a common malformed export.
+        contradictory_number = base == "row_number" and len(values) >= 3 and sum(looks_like_sequence(value) for value in values) / len(values) < 0.25
+        if column.method == "custom" or contradictory_number:
+            candidates.add(column.key)
+    occupied = {canonical_base_key(column.key) for column in columns if column.key not in candidates}
     updated: list[ColumnInfo] = []
     for column in columns:
         base = canonical_base_key(column.key)
-        if column.method != "custom" and base not in {""}:
+        if column.key not in candidates:
             updated.append(column)
             continue
-        values = [record.get(column.key, "") for record in records[:100] if cell_has_value(record.get(column.key, ""))]
+        values = samples[column.key]
         if not values:
             updated.append(column)
             continue
         sequence_ratio = sum(looks_like_sequence(value) for value in values) / len(values)
-        person_ratio = sum(looks_like_person_name(value) for value in values) / len(values)
+        person_ratio = sum(looks_like_person_name(value) and recognize_header(value).method not in {"alias", "question"} and not is_footer_or_label(value) for value in values) / len(values)
         class_ratio = sum(looks_like_class(value) for value in values) / len(values)
         enough_evidence = len(values) >= 3
         replacement: ColumnInfo | None = None
-        if enough_evidence and sequence_ratio >= 0.75 and "row_number" not in occupied:
+        numbers = [int(float(value)) for value in values if looks_like_sequence(value)]
+        sequential = len(numbers) >= 3 and sum(b == a + 1 or b == 1 for a, b in zip(numbers, numbers[1:])) / (len(numbers) - 1) >= 0.75
+        if enough_evidence and sequence_ratio >= 0.75 and sequential and "row_number" not in occupied:
             replacement = ColumnInfo("row_number", "No.", column.original or "Inferred row number", 0.9, "inferred")
         elif enough_evidence and person_ratio >= 0.75 and "student_name" not in occupied:
             replacement = ColumnInfo("student_name", "Student name", column.original or "Inferred student name", 0.88, "inferred")
@@ -1636,7 +1696,8 @@ def clean_student_records(
         if not name:
             diagnostics["blank_rows_removed"] += 1
             continue
-        if is_footer_or_label(name) or recognize_header(name).key == "student_name":
+        name_heading = recognize_header(name)
+        if is_footer_or_label(name) or (name_heading.key == "student_name" and name_heading.method == "alias"):
             diagnostics["non_student_rows_removed"] += 1
             continue
         # Lists and monitoring files should contain a plausible person name.
@@ -2681,13 +2742,21 @@ def select_dataset(request: SelectDatasetRequest) -> dict[str, Any]:
 @app.post("/api/preview")
 def preview(request: PreviewRequest) -> dict[str, Any]:
     session = get_session(request.session_id)
-    rows = build_output_rows(session, request)
+    rows, row_ids = build_output_result(session, request)
+    offset = min(request.offset, max(0, (len(rows) - 1) // request.limit * request.limit))
+    if request.focus_row_id in row_ids:
+        offset = row_ids.index(request.focus_row_id) // request.limit * request.limit
+    page = rows[offset : offset + request.limit]
     headers = list(rows[0].keys()) if rows else []
     return {
         "headers": headers,
-        "rows": rows[: request.limit],
+        "rows": page,
+        "row_ids": row_ids[offset : offset + request.limit],
+        "row_order": row_ids,
+        "offset": offset,
+        "focus_found": request.focus_row_id in row_ids,
         "row_count": len(rows),
-        "preview_count": min(len(rows), request.limit),
+        "preview_count": len(page),
     }
 
 

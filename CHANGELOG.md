@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Fix `Student name` being mistaken for № by substring matching. Prefer exact
+  aliases and whole phrases; recover duplicate numbering headings using names
+  beneath them, without inferring numbering from arbitrary numeric values.
+- Remove repeated contact headings even when a class value makes up the third
+  non-empty cell. Preserve plausible names that only weakly resemble headings.
+- Add paged previews with automatic focus on edited additions, drag/drop row
+  ordering, arrows, and cross-page position controls. Renumber № and sequences
+  after cleaning and ordering, using identical rules for all downloads.
+- Shorten English, Uzbek, and Russian instructions; highlight additions, reflect
+  edited column labels in the manual editor, and reject duplicate output labels.
+- Preserve column edits and sorting when changing interface language. Clear
+  failed previews instead of showing outdated results as current.
+
 - Prevent browsers from combining updated HTML with an older cached script or
   stylesheet. Asset URLs include content hashes, pages are not cached, and
   static responses require revalidation. Show the manual editor only after its
