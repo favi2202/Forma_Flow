@@ -51,6 +51,23 @@ preview and Excel, CSV, and Word downloads. Entirely blank rows are ignored;
 duplicate removal and blank-field filters may also exclude rows when enabled.
 Imported data is not modified.
 
+The preview displays 100 rows per page. Use its page controls to reach every row;
+editing an added student opens that student's page and highlights the row.
+Filters and duplicate removal can still hide an addition; the preview explains
+when this happens.
+
+Drag a row by its ⠿ handle to change its position. Arrow buttons work on touch
+screens, and the position field can move a student across pages. Imported №
+columns and calculated sequences are renumbered after ordering, filtering, and
+duplicate removal. Other values stay with their student. Excel, CSV, and Word
+use this same final order. Choosing a sort clears manual ordering.
+
+Review detected column labels in step 2; labels can be edited and those edits
+also appear in the add-row editor. Detection favors exact headings and whole
+phrases, checks ambiguous columns against their values, and removes repeated
+contact/header rows. This is deterministic detection, not a guarantee that every
+unfamiliar document will be classified correctly.
+
 Manual entries stay with their own dataset when switching datasets or languages.
 They are held in the current page's memory and included in preview/export
 requests, without being saved to browser storage or added to the server's source
@@ -64,6 +81,25 @@ API clients can pass `dataset_id` and `manual_rows` to `/api/preview` and
 fields remain compatible. Limits: 100 rows, 200 fields per row, 2,000 characters
 per value, and 200,000 combined key/value characters per request. The native
 Android interface does not yet expose the manual-row editor.
+
+For custom clients, `/api/preview` accepts `offset`, `limit` (up to 200), and an
+optional `focus_row_id`. It returns page `row_ids` and the complete `row_order`.
+Send that order to preview/export to reorder the result; use stable
+`manual_row_ids` alongside manual entries. Row identities are scoped to the
+explicit dataset. `options.renumber_rows=false` preserves imported numbering for
+clients that need it. Numbered output labels must be unique, like other columns.
+
+DOM integration tests exercise the real API and UI event handlers without a
+browser. Install the test-only dependency outside the app, then run:
+
+```bash
+npm install --prefix /tmp/formaflow-ui jsdom@26.1.0 --no-audit --no-fund
+NODE_PATH=/tmp/formaflow-ui/node_modules python tests/run_ui.py
+```
+
+These checks cover upload, translations, adding/editing rows past the first
+page, drag events, arrow/position controls, numbering, exports, and stale or
+failed previews. They do not simulate native pointer movement or visual layout.
 
 ### Input formats
 

@@ -89,3 +89,24 @@ main{max-width:1280px;margin:auto;padding:25px 28px 90px}.hero{display:grid;grid
 .manual-card button:disabled{opacity:.55;cursor:not-allowed}
 .manual-card :focus-visible{outline:3px solid var(--purple);outline-offset:2px}
 .manual-card th small{display:block;color:var(--muted);font-weight:400;font-size:.875rem}
+.manual-card{padding:16px;margin-bottom:20px}
+.manual-card .tool-title{margin-bottom:0}
+.manual-card .table-wrap{margin-top:12px}
+.manual-note{margin-top:8px}
+.manual-count:empty{display:none}
+.reorder-help{margin:0 0 10px;font-size:.875rem;color:var(--muted)}
+.row-controls{width:1%;padding:6px 8px}
+.row-tools{display:flex;align-items:center;gap:4px}
+.row-tools button,.preview-pages button{border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;min-width:32px;min-height:36px;cursor:pointer}
+.row-tools .row-handle{cursor:grab;font-size:1.35rem}
+.row-tools .row-handle:active{cursor:grabbing}
+.row-position,.preview-pages input{width:5rem;min-width:0;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;font-size:.875rem}
+.row-tools button:disabled,.preview-pages button:disabled{opacity:.4;cursor:default}
+.row-tools :focus-visible,.preview-pages :focus-visible{outline:3px solid var(--purple);outline-offset:2px}
+#previewBody .added-row{background:var(--soft)}
+#previewBody .focused-row{box-shadow:inset 3px 0 var(--purple)}
+#previewBody .drop-target{outline:2px solid var(--purple);outline-offset:-2px}
+.preview-pages{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px;margin-top:14px;font-size:.875rem}
+.preview-pages button{padding:8px 12px}
+.preview-pages label{display:flex;align-items:center;gap:8px}
+@media(max-width:650px){.row-tools button{min-width:40px;min-height:44px}.manual-card .tool-title{flex-wrap:wrap}}

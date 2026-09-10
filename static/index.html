@@ -126,19 +126,26 @@
           <div class="tool-title">
             <div>
               <h3 id="manualTitle" data-i18n="manualTitle">Missing students?</h3>
-              <p id="manualHelp" data-i18n="manualHelp">Add the missing rows here. Fixed values, calculations, and cleaning rules apply to these rows too. Only selected columns are exported.</p>
+              <p id="manualHelp" data-i18n="manualHelp">Added students appear in the preview and downloads.</p>
             </div>
             <button id="addStudent" class="secondary" type="button" data-i18n="addStudent" disabled>+ Add student</button>
           </div>
-          <p id="manualEmpty" class="manual-empty" data-i18n="manualEmpty">Your imported rows stay unchanged. Add a student to start typing.</p>
           <div id="manualTable" class="table-wrap hidden" role="region" aria-labelledby="manualTitle" tabindex="0">
             <table><thead id="manualHead"></thead><tbody id="manualBody"></tbody></table>
           </div>
           <p id="manualCount" class="manual-count" role="status" aria-live="polite"></p>
-          <p class="manual-note" data-i18n="manualNote">Blank rows are ignored. Entries stay with their dataset while this page is open. Download your result before closing or reloading.</p>
+          <p class="manual-note" data-i18n="manualNote">Download before closing this page.</p>
         </section>
         <div id="previewNote" class="preview-note" role="status" aria-live="polite"></div>
-        <div class="table-wrap"><table><thead id="previewHead"></thead><tbody id="previewBody"></tbody></table></div>
+        <p class="reorder-help" data-i18n="dragHelp">Drag ⠿ to reorder. № updates automatically.</p>
+        <div id="previewTableWrap" class="table-wrap"><table><thead id="previewHead"></thead><tbody id="previewBody"></tbody></table></div>
+        <nav id="previewPages" class="preview-pages hidden" aria-label="Preview pages">
+          <button id="firstPage" type="button" data-i18n="firstPage">First</button>
+          <button id="previousPage" type="button" data-i18n="previousPage">Previous</button>
+          <label><span data-i18n="page">Page</span> <input id="previewPage" type="number" min="1" value="1" aria-label="Page"> <span id="previewPageCount"></span></label>
+          <button id="nextPage" type="button" data-i18n="nextPage">Next</button>
+          <button id="lastPage" type="button" data-i18n="lastPage">Last</button>
+        </nav>
         <div class="export-actions">
           <button class="primary export" data-format="xlsx" type="button" data-i18n="downloadExcel">Download Excel</button>
           <button class="secondary export" data-format="csv" type="button" data-i18n="downloadCsv">Download CSV</button>

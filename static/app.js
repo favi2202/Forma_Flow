@@ -11,6 +11,14 @@ const state = {
   previewTimer: null,
   previewRevision: 0,
   manualRows: new Map(),
+  manualIds: new WeakMap(),
+  rowOrders: new Map(),
+  previewOffset: 0,
+  previewLimit: 100,
+  previewOrder: [],
+  previewReady: false,
+  focusRowId: null,
+  dragRowId: null,
 };
 
 const translations = {
@@ -21,7 +29,7 @@ const translations = {
     privacyHosted: "● Files are processed on this server",
     eyebrow: "Teacher paperwork, minus the copy-paste",
     heroTitle: "Understand the document first. Build the right table second.",
-    heroText: "FormaFlow classifies school files, separates different table types, repairs difficult rosters, and lets you export only the dataset you actually need.",
+    heroText: "Import school files, choose columns, and download your table.",
     worksLocally: "Works locally",
     worksHosted: "Server-assisted",
     formats: "XLSX · XLS · CSV · DOCX · DOC · PDF → XLSX · CSV · DOCX",
@@ -29,12 +37,12 @@ const translations = {
     chooseFiles: "Choose school documents",
     checkingServer: "Checking local server…",
     inputFiles: "Excel, Word, CSV, or PDF files",
-    uploadHint: "Select one or many files. FormaFlow will classify them and separate incompatible tables instead of mixing everything blindly.",
+    uploadHint: "Choose one or more files.",
     processFiles: "Analyze files",
     processing: "Analyzing…",
     stepDataset: "Detected data",
     chooseDataset: "Choose which dataset to work with",
-    datasetHelp: "Different structures remain separate, so a financial table or monitoring report cannot accidentally enter a class roster.",
+    datasetHelp: "Choose the table you want to edit.",
     dataset: "Dataset",
     noDataset: "No reliable data table was found. The file was still classified and its warnings are shown above.",
     step2: "Step 2",
@@ -60,14 +68,14 @@ const translations = {
     originalOrder: "Original order",
     step4: "Step 4",
     previewExport: "Preview and export",
-    manualTitle: "Missing students?",
-    manualHelp: "Add the missing rows here. Fixed values, calculations, and cleaning rules apply to these rows too. Only selected columns are exported.",
+    manualTitle: "Add students",
+    manualHelp: "Added rows appear in the preview and downloads.",
     addStudent: "+ Add student",
     addRow: "+ Add row",
-    manualGenericTitle: "Missing rows?",
+    manualGenericTitle: "Add rows",
     manualEmpty: "Your imported rows stay unchanged. Add a row to start typing.",
-    manualNote: "Blank rows are ignored. Entries stay with their dataset while this page is open. Download your result before closing or reloading.",
-    manualCount: "{count} filled manual row(s) · {total}/100 rows added",
+    manualNote: "Download before closing this page.",
+    manualCount: "{count} filled · {total}/100 added",
     manualRow: "Added row {number}",
     removeManual: "Remove added row {number}",
     manualLimit: "You can add up to 100 rows per dataset.",
@@ -86,7 +94,7 @@ const translations = {
     ready: "Ready",
     error: "Error",
     rows: "{count} rows",
-    previewShowing: "Showing {shown} of {count} result rows.",
+    previewShowing: "{start}–{shown} of {count} rows",
     selectColumn: "Select at least one column.",
     uploadFirst: "Upload files first.",
     downloadStarted: "{format} download started",
@@ -154,6 +162,18 @@ const translations = {
     blankRowsRemoved: "{count} blank row(s) removed",
     nonStudentRowsRemoved: "{count} footer/header row(s) removed",
     continuationRowsMerged: "{count} continuation row(s) merged",
+    rowOrder: "Order",
+    positionOfRow: "Position of row {number}",
+    dragRow: "Move row {number}",
+    dragHelp: "Drag ⠿ to reorder. № updates automatically.",
+    moveToPosition: "Move to position",
+    page: "Page",
+    firstPage: "First",
+    previousPage: "Previous",
+    nextPage: "Next",
+    lastPage: "Last",
+    rowFiltered: "This addition is hidden by a filter or duplicate removal.",
+    noResultRows: "No matching rows.",
     documentTypes: {
       student_roster_document: "Student roster",
       promotion_document: "Class-promotion document",
@@ -183,7 +203,7 @@ const translations = {
     privacyHosted: "● Fayllar ushbu serverda qayta ishlanadi",
     eyebrow: "O‘qituvchi hujjatlari — ortiqcha nusxalashsiz",
     heroTitle: "Avval hujjatni tushuning. Keyin kerakli jadvalni yarating.",
-    heroText: "FormaFlow maktab fayllarini tasniflaydi, turli jadvallarni aralashtirmaydi, murakkab ro‘yxatlarni tuzatadi va faqat kerakli ma’lumotni eksport qiladi.",
+    heroText: "Fayllarni yuklang, ustunlarni tanlang va tayyor jadvalni oling.",
     worksLocally: "Mahalliy ishlaydi",
     worksHosted: "Server orqali ishlaydi",
     formats: "XLSX · XLS · CSV · DOCX · DOC · PDF → XLSX · CSV · DOCX",
@@ -191,12 +211,12 @@ const translations = {
     chooseFiles: "Maktab hujjatlarini tanlang",
     checkingServer: "Mahalliy server tekshirilmoqda…",
     inputFiles: "Excel, Word, CSV yoki PDF fayllari",
-    uploadHint: "Bir yoki bir nechta faylni tanlang. FormaFlow ularni tasniflaydi va mos kelmaydigan jadvallarni alohida saqlaydi.",
+    uploadHint: "Bir yoki bir nechta faylni tanlang.",
     processFiles: "Fayllarni tahlil qilish",
     processing: "Tahlil qilinmoqda…",
     stepDataset: "Aniqlangan ma’lumot",
     chooseDataset: "Ishlanadigan ma’lumotlar to‘plamini tanlang",
-    datasetHelp: "Turli tuzilmalar alohida qoladi, shuning uchun moliyaviy jadval yoki monitoring ro‘yxatga tasodifan qo‘shilmaydi.",
+    datasetHelp: "Tahrirlash uchun jadvalni tanlang.",
     dataset: "Ma’lumotlar to‘plami",
     noDataset: "Ishonchli jadval topilmadi. Fayl tasniflandi va ogohlantirishlar yuqorida ko‘rsatildi.",
     step2: "2-qadam",
@@ -222,14 +242,14 @@ const translations = {
     originalOrder: "Asl tartib",
     step4: "4-qadam",
     previewExport: "Ko‘rib chiqish va eksport",
-    manualTitle: "Ro‘yxatda o‘quvchilar yetishmayaptimi?",
-    manualHelp: "Yetishmayotgan qatorlarni shu yerda qo‘shing. Doimiy qiymatlar, hisoblash va tozalash qoidalari bu qatorlarga ham qo‘llanadi. Faqat tanlangan ustunlar eksport qilinadi.",
+    manualTitle: "O‘quvchi qo‘shish",
+    manualHelp: "Yangi qatorlar jadvalda va yuklangan faylda ko‘rinadi.",
     addStudent: "+ O‘quvchi qo‘shish",
     addRow: "+ Qator qo‘shish",
-    manualGenericTitle: "Qatorlar yetishmayaptimi?",
+    manualGenericTitle: "Qator qo‘shish",
     manualEmpty: "Fayldan olingan qatorlar o‘zgarmaydi. Yozishni boshlash uchun qator qo‘shing.",
-    manualNote: "Bo‘sh qatorlar hisobga olinmaydi. Sahifa ochiq turganida yozuvlar o‘z to‘plamida saqlanadi. Sahifani yopish yoki yangilashdan oldin natijani yuklab oling.",
-    manualCount: "{count} ta to‘ldirilgan qator · {total}/100 ta qator qo‘shildi",
+    manualNote: "Sahifani yopishdan oldin faylni yuklab oling.",
+    manualCount: "{count} ta to‘ldirildi · {total}/100 ta qo‘shildi",
     manualRow: "Qo‘shilgan {number}-qator",
     removeManual: "Qo‘shilgan {number}-qatorni olib tashlash",
     manualLimit: "Har bir to‘plamga 100 tagacha qator qo‘shish mumkin.",
@@ -248,7 +268,7 @@ const translations = {
     ready: "Tayyor",
     error: "Xato",
     rows: "{count} qator",
-    previewShowing: "Natijaning {count} qatoridan {shown} tasi ko‘rsatilmoqda.",
+    previewShowing: "{count} qatordan {start}–{shown}",
     selectColumn: "Kamida bitta ustunni tanlang.",
     uploadFirst: "Avval fayllarni yuklang.",
     downloadStarted: "{format} yuklanishi boshlandi",
@@ -316,6 +336,18 @@ const translations = {
     blankRowsRemoved: "{count} ta bo‘sh qator o‘chirildi",
     nonStudentRowsRemoved: "{count} ta sarlavha/pastki qator o‘chirildi",
     continuationRowsMerged: "{count} ta davomiy qator birlashtirildi",
+    rowOrder: "Tartib",
+    positionOfRow: "{number}-qator o‘rni",
+    dragRow: "{number}-qatorni ko‘chirish",
+    dragHelp: "Tartibni o‘zgartirish uchun ⠿ ni torting. № avtomatik yangilanadi.",
+    moveToPosition: "Yangi o‘ringa ko‘chirish",
+    page: "Sahifa",
+    firstPage: "Birinchi",
+    previousPage: "Oldingi",
+    nextPage: "Keyingi",
+    lastPage: "Oxirgi",
+    rowFiltered: "Bu qator filtr yoki takrorlarni olib tashlash sababli yashirilgan.",
+    noResultRows: "Mos qatorlar yo‘q.",
     documentTypes: {
       student_roster_document: "O‘quvchilar ro‘yxati",
       promotion_document: "Sinfdan-sinfga ko‘chirish hujjati",
@@ -345,7 +377,7 @@ const translations = {
     privacyHosted: "● Файлы обрабатываются на этом сервере",
     eyebrow: "Школьные документы без бесконечного копирования",
     heroTitle: "Сначала понять документ. Затем собрать нужную таблицу.",
-    heroText: "FormaFlow классифицирует школьные файлы, разделяет разные типы таблиц, исправляет сложные списки и экспортирует только нужный набор данных.",
+    heroText: "Загрузите файлы, выберите столбцы и скачайте таблицу.",
     worksLocally: "Работает локально",
     worksHosted: "Обработка на сервере",
     formats: "XLSX · XLS · CSV · DOCX · DOC · PDF → XLSX · CSV · DOCX",
@@ -353,12 +385,12 @@ const translations = {
     chooseFiles: "Выберите школьные документы",
     checkingServer: "Проверка локального сервера…",
     inputFiles: "Файлы Excel, Word, CSV или PDF",
-    uploadHint: "Выберите один или несколько файлов. FormaFlow классифицирует их и не смешивает несовместимые таблицы.",
+    uploadHint: "Выберите один или несколько файлов.",
     processFiles: "Анализировать файлы",
     processing: "Анализ…",
     stepDataset: "Обнаруженные данные",
     chooseDataset: "Выберите набор данных для работы",
-    datasetHelp: "Разные структуры остаются отдельными, поэтому финансовая или мониторинговая таблица не попадёт в список класса случайно.",
+    datasetHelp: "Выберите таблицу для редактирования.",
     dataset: "Набор данных",
     noDataset: "Надёжная таблица не найдена. Файл классифицирован, предупреждения показаны выше.",
     step2: "Шаг 2",
@@ -384,14 +416,14 @@ const translations = {
     originalOrder: "Исходный порядок",
     step4: "Шаг 4",
     previewExport: "Предпросмотр и экспорт",
-    manualTitle: "Не хватает учеников?",
-    manualHelp: "Добавьте недостающие строки здесь. К ним также применяются постоянные значения, вычисления и очистка. Экспортируются только выбранные столбцы.",
+    manualTitle: "Добавить учеников",
+    manualHelp: "Новые строки появятся в таблице и скачанном файле.",
     addStudent: "+ Добавить ученика",
     addRow: "+ Добавить строку",
-    manualGenericTitle: "Не хватает строк?",
+    manualGenericTitle: "Добавить строки",
     manualEmpty: "Импортированные строки не изменятся. Добавьте строку, чтобы начать ввод.",
-    manualNote: "Пустые строки пропускаются. Записи остаются в своём наборе, пока страница открыта. Скачайте результат перед закрытием или перезагрузкой.",
-    manualCount: "Заполнено строк: {count} · Добавлено: {total}/100",
+    manualNote: "Скачайте файл перед закрытием страницы.",
+    manualCount: "Заполнено: {count} · Добавлено: {total}/100",
     manualRow: "Добавленная строка {number}",
     removeManual: "Удалить добавленную строку {number}",
     manualLimit: "В каждый набор можно добавить до 100 строк.",
@@ -410,7 +442,7 @@ const translations = {
     ready: "Готово",
     error: "Ошибка",
     rows: "{count} строк",
-    previewShowing: "Показано {shown} из {count} строк результата.",
+    previewShowing: "{start}–{shown} из {count} строк",
     selectColumn: "Выберите хотя бы один столбец.",
     uploadFirst: "Сначала загрузите файлы.",
     downloadStarted: "Загрузка {format} началась",
@@ -478,6 +510,18 @@ const translations = {
     blankRowsRemoved: "Удалено пустых строк: {count}",
     nonStudentRowsRemoved: "Удалено заголовков/служебных строк: {count}",
     continuationRowsMerged: "Объединено продолжений строк: {count}",
+    rowOrder: "Порядок",
+    positionOfRow: "Позиция строки {number}",
+    dragRow: "Переместить строку {number}",
+    dragHelp: "Перетащите ⠿ для смены порядка. № обновится автоматически.",
+    moveToPosition: "Переместить на позицию",
+    page: "Страница",
+    firstPage: "Первая",
+    previousPage: "Назад",
+    nextPage: "Вперёд",
+    lastPage: "Последняя",
+    rowFiltered: "Эта строка скрыта фильтром или удалением повторов.",
+    noResultRows: "Нет подходящих строк.",
     documentTypes: {
       student_roster_document: "Список учеников",
       promotion_document: "Документ о переводе классов",
@@ -583,7 +627,7 @@ function applyTranslations() {
   if (defaultAcademic && defaultAcademic.dataset.auto !== "false") defaultAcademic.value = t("academicYear");
   renderDatasetPanel();
   renderFiles();
-  renderColumns();
+  renderColumns(true);
   populateSourceSelects();
   renderDerivedRows(true);
   renderManualRows();
@@ -643,6 +687,8 @@ uploadForm.addEventListener("submit", async (event) => {
     const previousSessionId = state.sessionId;
     state.sessionId = payload.session_id;
     state.manualRows.clear();
+    state.rowOrders.clear();
+    state.previewOrder = [];
     state.previewRevision += 1;
     if (previousSessionId && previousSessionId !== state.sessionId) {
       fetch(`/api/session/${encodeURIComponent(previousSessionId)}`, { method: "DELETE" }).catch(() => {});
@@ -787,6 +833,8 @@ datasetSelect.addEventListener("change", async () => {
 });
 
 function applyActiveDataset(payload) {
+  state.previewOffset = 0;
+  state.focusRowId = null;
   state.columns = payload.columns || [];
   state.rowCount = payload.row_count || 0;
   state.activeDatasetId = payload.active_dataset_id || state.activeDatasetId;
@@ -827,7 +875,8 @@ function canonicalLabel(column) {
     place: "place",
     score: "score",
   };
-  return mapping[base] ? t(mapping[base]) : column.label || column.originals?.[0] || t("untitled");
+  const suffix = mapping[base] && column.key !== base ? ` ${column.key.slice(base.length + 1)}` : "";
+  return mapping[base] ? t(mapping[base]) + suffix : column.label || column.originals?.[0] || t("untitled");
 }
 
 function methodLabel(method) {
@@ -848,6 +897,16 @@ function activeManualRows() {
   return state.manualRows.get(state.activeDatasetId);
 }
 
+function manualRowId(row) {
+  if (!state.manualIds.has(row)) state.manualIds.set(row, `manual:${crypto.randomUUID()}`);
+  return state.manualIds.get(row);
+}
+
+function editorLabel(column) {
+  const card = [...columnList.querySelectorAll(".column-card")].find((item) => item.querySelector(".column-check").dataset.key === column.key);
+  return card?.querySelector(".column-name").value.trim() || canonicalLabel(column);
+}
+
 function hasManualEntries() {
   return [...state.manualRows.values()].some((rows) => rows.some((row) => Object.values(row).some((value) => value.trim())));
 }
@@ -864,12 +923,12 @@ function renderManualRows() {
   const hasStudents = state.columns.some((column) => ["student_name", "first_name", "last_name"].includes(column.key));
   $("manualTitle").textContent = t(hasStudents ? "manualTitle" : "manualGenericTitle");
   $("addStudent").textContent = t(hasStudents ? "addStudent" : "addRow");
-  $("manualEmpty").classList.toggle("hidden", rows.length > 0);
   $("manualTable").classList.toggle("hidden", rows.length === 0);
-  $("manualHead").innerHTML = `<tr><th scope="col">#</th>${state.columns.map((column) => `<th scope="col">${escapeHtml(canonicalLabel(column))}${column.sensitive ? `<small>${escapeHtml(t("sensitiveField"))}</small>` : ""}</th>`).join("")}<th scope="col">${escapeHtml(t("remove"))}</th></tr>`;
+  const editableColumns = state.columns.filter((column) => column.key.replace(/_\d+$/, "") !== "row_number");
+  $("manualHead").innerHTML = `<tr><th scope="col">#</th>${editableColumns.map((column) => `<th scope="col">${escapeHtml(editorLabel(column))}${column.sensitive ? `<small>${escapeHtml(t("sensitiveField"))}</small>` : ""}</th>`).join("")}<th scope="col">${escapeHtml(t("remove"))}</th></tr>`;
   $("manualBody").innerHTML = rows.map((row, index) => `<tr>
     <th scope="row" class="manual-row-number">${index + 1}</th>
-    ${state.columns.map((column) => `<td><input class="manual-input" type="text" data-row="${index}" data-key="${escapeHtml(column.key)}" value="${escapeHtml(row[column.key] || "")}" maxlength="2000" autocomplete="off" aria-label="${escapeHtml(t("manualRow", { number: index + 1 }) + ": " + canonicalLabel(column))}" aria-describedby="manualHelp"></td>`).join("")}
+    ${editableColumns.map((column) => `<td><input class="manual-input" type="text" data-row="${index}" data-key="${escapeHtml(column.key)}" value="${escapeHtml(row[column.key] || "")}" maxlength="2000" autocomplete="off" aria-label="${escapeHtml(t("manualRow", { number: index + 1 }) + ": " + editorLabel(column))}" aria-describedby="manualHelp"></td>`).join("")}
     <td><button class="remove" type="button" data-row="${index}" aria-label="${escapeHtml(t("removeManual", { number: index + 1 }))}">×</button></td>
   </tr>`).join("");
   updateManualCount();
@@ -892,6 +951,7 @@ $("manualBody").addEventListener("input", (event) => {
   const row = activeManualRows()[Number(event.target.dataset.row)];
   if (!row) return;
   row[event.target.dataset.key] = event.target.value;
+  state.focusRowId = manualRowId(row);
   updateManualCount();
   renderPreviewDebounced();
 });
@@ -900,7 +960,10 @@ $("manualBody").addEventListener("click", (event) => {
   const button = event.target.closest("button.remove");
   if (!button) return;
   const index = Number(button.dataset.row);
-  activeManualRows().splice(index, 1);
+  const [removed] = activeManualRows().splice(index, 1);
+  const removedId = manualRowId(removed);
+  state.rowOrders.set(state.activeDatasetId, (state.rowOrders.get(state.activeDatasetId) || []).filter((id) => id !== removedId));
+  state.focusRowId = null;
   renderManualRows();
   const next = $("manualBody").children[index] || $("manualBody").lastElementChild;
   (next?.querySelector("input") || $("addStudent")).focus();
@@ -913,13 +976,20 @@ window.addEventListener("beforeunload", (event) => {
   event.returnValue = "";
 });
 
-function renderColumns() {
+function renderColumns(preserve = false) {
   if (!columnList || !state.columns.length) {
     if (columnList) columnList.innerHTML = "";
     return;
   }
-  columnList.innerHTML = state.columns.map((column) => {
-    const selected = Boolean(column.default_selected);
+  const existing = new Map(preserve ? [...columnList.querySelectorAll(".column-card")].map((card) => [card.querySelector(".column-check").dataset.key, {
+    selected: card.querySelector(".column-check").checked,
+    name: card.querySelector(".column-name").value,
+    renamed: card.querySelector(".column-name").dataset.renamed === "true",
+  }]) : []);
+  const columns = preserve ? [...state.columns].sort((a, b) => [...existing.keys()].indexOf(a.key) - [...existing.keys()].indexOf(b.key)) : state.columns;
+  columnList.innerHTML = columns.map((column) => {
+    const previous = existing.get(column.key);
+    const selected = previous ? previous.selected : Boolean(column.default_selected);
     const sourceNames = (column.originals || []).join(" / ") || column.label;
     return `<article class="column-card ${selected ? "selected" : ""}">
       <input class="column-check" type="checkbox" data-key="${escapeHtml(column.key)}" ${selected ? "checked" : ""}>
@@ -935,7 +1005,7 @@ function renderColumns() {
           </span>
         </div>
         <label>
-          <input class="column-name" value="${escapeHtml(canonicalLabel(column))}" aria-label="${escapeHtml(t("outputName"))}">
+          <input class="column-name" value="${escapeHtml(previous?.renamed ? previous.name : canonicalLabel(column))}" data-renamed="${previous?.renamed || false}" aria-label="${escapeHtml(t("outputName"))}">
           ${column.sensitive ? `<span class="sensitive-badge">${escapeHtml(t("sensitiveField"))}</span>` : ""}
         </label>
       </div>
@@ -948,7 +1018,11 @@ function renderColumns() {
       renderPreviewDebounced();
     });
   });
-  columnList.querySelectorAll(".column-name").forEach((input) => input.addEventListener("input", renderPreviewDebounced));
+  columnList.querySelectorAll(".column-name").forEach((input) => input.addEventListener("input", () => {
+    input.dataset.renamed = "true";
+    renderManualRows();
+    renderPreviewDebounced();
+  }));
   columnList.querySelectorAll(".move-button").forEach((button) => {
     button.addEventListener("click", () => {
       const card = button.closest(".column-card");
@@ -1066,9 +1140,13 @@ function getDerivedColumns() {
 
 function populateSourceSelects() {
   if (!skipBlankKey || !sortKey) return;
+  const previousSkip = skipBlankKey.value;
+  const previousSort = sortKey.value;
   const blank = `<option value="">${escapeHtml(t("disabled"))}</option>`;
   skipBlankKey.innerHTML = blank + sourceOptions();
   sortKey.innerHTML = `<option value="">${escapeHtml(t("originalOrder"))}</option>` + sourceOptions();
+  if (state.columns.some((column) => column.key === previousSkip)) skipBlankKey.value = previousSkip;
+  if (state.columns.some((column) => column.key === previousSort)) sortKey.value = previousSort;
   renderDerivedRows(false);
 }
 
@@ -1093,6 +1171,8 @@ function buildPayload() {
     session_id: state.sessionId,
     dataset_id: state.activeDatasetId,
     manual_rows: activeManualRows(),
+    manual_row_ids: activeManualRows().map(manualRowId),
+    row_order: state.rowOrders.get(state.activeDatasetId) || [],
     columns: getSelectedColumns(),
     fixed_columns: getFixedColumns(),
     derived_columns: getDerivedColumns(),
@@ -1102,6 +1182,7 @@ function buildPayload() {
 
 function renderPreviewDebounced() {
   state.previewRevision += 1;
+  state.previewReady = false;
   if (!state.sessionId || !state.activeDatasetId) return;
   clearTimeout(state.previewTimer);
   previewNote.textContent = t("previewLoading");
@@ -1116,28 +1197,138 @@ async function updatePreview() {
     previewHead.innerHTML = "";
     previewBody.innerHTML = `<tr><td>${escapeHtml(t("selectColumn"))}</td></tr>`;
     previewNote.textContent = "";
+    $("previewPages").classList.add("hidden");
     return;
   }
+  const focusId = state.focusRowId;
   try {
     const response = await fetch("/api/preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...buildPayload(), limit: 50 }),
+      body: JSON.stringify({ ...buildPayload(), limit: state.previewLimit, offset: state.previewOffset, focus_row_id: focusId }),
     });
     const payload = await response.json();
     if (revision !== state.previewRevision) return;
     if (!response.ok) throw new Error(apiErrorMessage(payload.detail));
+    state.previewOrder = payload.row_order;
+    state.previewOffset = payload.offset;
+    state.previewReady = true;
     rowCount.textContent = t("rows", { count: payload.row_count });
-    previewNote.textContent = t("previewShowing", { shown: payload.preview_count, count: payload.row_count });
-    previewHead.innerHTML = payload.headers.length ? `<tr>${payload.headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>` : "";
+    previewNote.textContent = t("previewShowing", { start: payload.row_count ? payload.offset + 1 : 0, shown: payload.offset + payload.preview_count, count: payload.row_count });
+    if (focusId && !payload.focus_found) {
+      const row = activeManualRows().find((item) => manualRowId(item) === focusId);
+      if (row && Object.values(row).some((value) => value.trim())) previewNote.textContent += " " + t("rowFiltered");
+    }
+    previewHead.innerHTML = payload.headers.length ? `<tr><th scope="col" class="row-controls">${escapeHtml(t("rowOrder"))}</th>${payload.headers.map((header) => `<th scope="col">${escapeHtml(header)}</th>`).join("")}</tr>` : "";
     previewBody.innerHTML = payload.rows.length
-      ? payload.rows.map((row) => `<tr>${payload.headers.map((header) => `<td>${escapeHtml(row[header] ?? "")}</td>`).join("")}</tr>`).join("")
-      : `<tr><td>${escapeHtml(t("selectColumn"))}</td></tr>`;
+      ? payload.rows.map((row, index) => {
+        const rowId = payload.row_ids[index];
+        const position = payload.offset + index + 1;
+        const label = escapeHtml(t("positionOfRow", { number: position }));
+        return `<tr data-row-id="${escapeHtml(rowId)}" class="${rowId.startsWith("manual:") ? "added-row" : ""} ${rowId === focusId ? "focused-row" : ""}">
+          <td class="row-controls"><div class="row-tools">
+            <button type="button" class="row-handle" draggable="true" aria-label="${escapeHtml(t("dragRow", { number: position }))}" title="${escapeHtml(t("dragHelp"))}">⠿</button>
+            <button type="button" data-direction="-1" aria-label="${escapeHtml(t("moveUp"))}" ${position === 1 ? "disabled" : ""}>↑</button>
+            <button type="button" data-direction="1" aria-label="${escapeHtml(t("moveDown"))}" ${position === payload.row_count ? "disabled" : ""}>↓</button>
+            <input class="row-position" type="number" min="1" max="${payload.row_count}" value="${position}" aria-label="${label}" title="${escapeHtml(t("moveToPosition"))}">
+          </div></td>${payload.headers.map((header) => `<td>${escapeHtml(row[header] ?? "")}</td>`).join("")}</tr>`;
+      }).join("")
+      : `<tr><td>${escapeHtml(t("noResultRows"))}</td></tr>`;
+    const pageCount = Math.max(1, Math.ceil(payload.row_count / state.previewLimit));
+    $("previewPages").classList.toggle("hidden", pageCount <= 1);
+    $("previewPage").value = Math.floor(payload.offset / state.previewLimit) + 1;
+    $("previewPage").max = pageCount;
+    $("previewPage").setAttribute("aria-label", t("page"));
+    $("previewPageCount").textContent = `/ ${pageCount}`;
+    $("firstPage").disabled = $("previousPage").disabled = payload.offset === 0;
+    $("nextPage").disabled = $("lastPage").disabled = payload.offset + state.previewLimit >= payload.row_count;
+    if (focusId && payload.focus_found) {
+      const row = [...previewBody.rows].find((item) => item.dataset.rowId === focusId);
+      if (row) $("previewTableWrap").scrollTop = Math.max(0, row.offsetTop - previewHead.offsetHeight);
+    }
   } catch (error) {
     if (revision !== state.previewRevision) return;
+    state.previewReady = false;
     previewNote.textContent = error.message || t("previewFailed");
+    previewBody.innerHTML = "";
+    previewHead.innerHTML = "";
+    $("previewPages").classList.add("hidden");
   }
 }
+
+function movePreviewRow(rowId, targetIndex) {
+  if (!state.previewReady || !Number.isInteger(targetIndex)) return;
+  const order = [...state.previewOrder];
+  const from = order.indexOf(rowId);
+  if (from < 0 || targetIndex < 0 || targetIndex >= order.length || from === targetIndex) return;
+  order.splice(from, 1);
+  order.splice(targetIndex, 0, rowId);
+  // Retain filtered-out identities so later edits can bring those rows back.
+  const visible = new Set(order);
+  const hidden = (state.rowOrders.get(state.activeDatasetId) || []).filter((id) => !visible.has(id));
+  state.rowOrders.set(state.activeDatasetId, [...order, ...hidden]);
+  // A manual move now defines order. Choosing a sort again resets manual order.
+  sortKey.value = "";
+  state.focusRowId = rowId;
+  renderPreviewDebounced();
+}
+
+previewBody.addEventListener("dragstart", (event) => {
+  const handle = event.target.closest(".row-handle");
+  if (!handle || !state.previewReady) return event.preventDefault();
+  state.dragRowId = handle.closest("tr").dataset.rowId;
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", state.dragRowId);
+});
+previewBody.addEventListener("dragover", (event) => {
+  const row = event.target.closest("tr[data-row-id]");
+  if (!row || !state.dragRowId || !state.previewReady) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+  previewBody.querySelector(".drop-target")?.classList.remove("drop-target");
+  row.classList.add("drop-target");
+});
+previewBody.addEventListener("drop", (event) => {
+  const row = event.target.closest("tr[data-row-id]");
+  if (!row || !state.dragRowId) return;
+  event.preventDefault();
+  movePreviewRow(state.dragRowId, state.previewOrder.indexOf(row.dataset.rowId));
+  state.dragRowId = null;
+  row.classList.remove("drop-target");
+});
+previewBody.addEventListener("dragend", () => {
+  state.dragRowId = null;
+  previewBody.querySelector(".drop-target")?.classList.remove("drop-target");
+});
+previewBody.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-direction]");
+  if (!button) return;
+  const rowId = button.closest("tr").dataset.rowId;
+  movePreviewRow(rowId, state.previewOrder.indexOf(rowId) + Number(button.dataset.direction));
+});
+previewBody.addEventListener("change", (event) => {
+  if (event.target.matches(".row-position")) movePreviewRow(event.target.closest("tr").dataset.rowId, Number(event.target.value) - 1);
+});
+previewBody.addEventListener("keydown", (event) => {
+  if (!event.target.matches(".row-handle") || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
+  event.preventDefault();
+  const rowId = event.target.closest("tr").dataset.rowId;
+  movePreviewRow(rowId, state.previewOrder.indexOf(rowId) + (event.key === "ArrowUp" ? -1 : 1));
+});
+function goToPreviewPage(page) {
+  if (!state.previewReady || !Number.isInteger(page)) return;
+  const count = Math.max(1, Math.ceil(state.previewOrder.length / state.previewLimit));
+  state.previewOffset = (Math.min(count, Math.max(1, page)) - 1) * state.previewLimit;
+  state.focusRowId = null;
+  $("previewTableWrap").scrollTop = 0;
+  renderPreviewDebounced();
+}
+$("firstPage").addEventListener("click", () => goToPreviewPage(1));
+$("previousPage").addEventListener("click", () => goToPreviewPage(state.previewOffset / state.previewLimit));
+$("nextPage").addEventListener("click", () => goToPreviewPage(state.previewOffset / state.previewLimit + 2));
+$("lastPage").addEventListener("click", () => goToPreviewPage(Math.ceil(state.previewOrder.length / state.previewLimit)));
+$("previewPage").addEventListener("change", (event) => goToPreviewPage(Number(event.target.value)));
+
 
 $("toggleAll").addEventListener("click", () => {
   const boxes = [...columnList.querySelectorAll(".column-check")];
@@ -1173,6 +1364,7 @@ fixedList.addEventListener("click", (event) => {
   }
 });
 
+sortKey.addEventListener("change", () => { state.rowOrders.delete(state.activeDatasetId); state.focusRowId = null; state.previewOffset = 0; });
 [$("trimWhitespace"), $("removeDuplicates"), skipBlankKey, sortKey].forEach((control) => control.addEventListener("change", renderPreviewDebounced));
 
 document.querySelectorAll(".export").forEach((button) => button.addEventListener("click", () => downloadExport(button.dataset.format)));
@@ -1222,6 +1414,10 @@ $("clearButton").addEventListener("click", () => {
   state.activeDatasetId = null;
   state.rowCount = 0;
   state.manualRows.clear();
+  state.rowOrders.clear();
+  state.previewOrder = [];
+  state.previewOffset = 0;
+  state.focusRowId = null;
   state.previewRevision += 1;
   clearTimeout(state.previewTimer);
   renderManualRows();
