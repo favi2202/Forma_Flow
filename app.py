@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 import re
@@ -55,8 +56,12 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 @app.middleware("http")
 async def privacy_security_headers(request: Any, call_next: Any) -> Response:
     response = await call_next(request)
-    if request.url.path.startswith("/api/") or request.url.path == "/health":
+    if request.url.path.startswith("/api/") or request.url.path in {"/", "/health", "/static/index.html"}:
         response.headers["Cache-Control"] = "no-store"
+    elif request.url.path.startswith("/static/"):
+        # Revalidate even old, unversioned links; browser heuristic caching can
+        # otherwise pair new HTML with a script that does not know its controls.
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["X-Frame-Options"] = "DENY"
@@ -1318,7 +1323,6 @@ def create_docx(rows: list[dict[str, Any]]) -> bytes:
 # FormaFlow v0.6 - Document Intelligence engine
 # ---------------------------------------------------------------------------
 
-import hashlib
 from collections import defaultdict
 
 try:
@@ -2536,8 +2540,12 @@ class SelectDatasetRequest(BaseModel):
 
 
 @app.get("/", response_class=HTMLResponse)
-def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+def index() -> HTMLResponse:
+    page = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    for filename in ("app.js", "styles.css"):
+        fingerprint = hashlib.sha256((STATIC_DIR / filename).read_bytes()).hexdigest()[:16]
+        page = page.replace(f'"/static/{filename}"', f'"/static/{filename}?v={fingerprint}"')
+    return HTMLResponse(page)
 
 
 @app.get("/health")

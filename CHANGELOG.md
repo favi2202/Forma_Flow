@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Prevent browsers from combining updated HTML with an older cached script or
+  stylesheet. Asset URLs include content hashes, pages are not cached, and
+  static responses require revalidation. Show the manual editor only after its
+  labels and controls have initialized.
+
 - Add editable manual rows to the web preview/export workflow, with English,
   Uzbek, and Russian labels and per-dataset state.
 - Include additions in Excel, CSV, and Word using existing output rules; ignore
