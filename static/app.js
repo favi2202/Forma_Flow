@@ -873,6 +873,8 @@ function renderManualRows() {
     <td><button class="remove" type="button" data-row="${index}" aria-label="${escapeHtml(t("removeManual", { number: index + 1 }))}">×</button></td>
   </tr>`).join("");
   updateManualCount();
+  // Reveal only after this script has translated and initialized the editor.
+  $("manualPanel")?.classList.remove("hidden");
 }
 
 $("addStudent").addEventListener("click", () => {

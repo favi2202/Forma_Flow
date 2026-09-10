@@ -122,13 +122,13 @@
           <div><span class="step-label" data-i18n="step4">Step 4</span><h2 data-i18n="previewExport">Preview and export</h2></div>
           <span id="rowCount" class="status good"></span>
         </div>
-        <section class="tool-card manual-card" aria-labelledby="manualTitle">
+        <section id="manualPanel" class="tool-card manual-card hidden" aria-labelledby="manualTitle">
           <div class="tool-title">
             <div>
               <h3 id="manualTitle" data-i18n="manualTitle">Missing students?</h3>
               <p id="manualHelp" data-i18n="manualHelp">Add the missing rows here. Fixed values, calculations, and cleaning rules apply to these rows too. Only selected columns are exported.</p>
             </div>
-            <button id="addStudent" class="secondary" type="button" data-i18n="addStudent">+ Add student</button>
+            <button id="addStudent" class="secondary" type="button" data-i18n="addStudent" disabled>+ Add student</button>
           </div>
           <p id="manualEmpty" class="manual-empty" data-i18n="manualEmpty">Your imported rows stay unchanged. Add a student to start typing.</p>
           <div id="manualTable" class="table-wrap hidden" role="region" aria-labelledby="manualTitle" tabindex="0">
